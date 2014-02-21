@@ -10,15 +10,24 @@ import java.util.Queue;
 import net.cjlucas.boombox.provider.AudioDataProvider;
 
 public class Boombox
+implements
+MediaPlayer.OnBufferingUpdateListener,
+MediaPlayer.OnCompletionListener,
+MediaPlayer.OnErrorListener,
+MediaPlayer.OnInfoListener,
+MediaPlayer.OnPreparedListener,
+MediaPlayer.OnSeekCompleteListener
 {
-	private List<AudioDataProvider> providersList;
-	private Queue<AudioDataProvider> providersQueue;
+	private List<AudioDataProvider> providers;
+	private List<AudioDataProvider> playlist;
+	private int queueCursor;
 	private List<MediaPlayer> players;
 
 	public Boombox()
 	{
-		this.providersList  = new ArrayList<AudioDataProvider>();
-		this.providersQueue = new LinkedList<AudioDataProvider>();
+		this.providers = new ArrayList<AudioDataProvider>();
+		this.playlist  = new ArrayList<AudioDataProvider>();
+		this.players   = new ArrayList<MediaPlayer>();
 	}
 
 	// Providers Management
@@ -60,6 +69,17 @@ public class Boombox
 
 	// Playback Controls
 
+	private MediaPlayer getCurrentPlayer()
+	{
+		MediaPlayer player = null;
+
+		if (this.players.size() > 0) {
+			player = this.players.get(0);
+		}
+
+		return player;
+	}
+
 	public void play()
 	{
 		// TODO
@@ -81,6 +101,40 @@ public class Boombox
 	}
 
 	public void setContinuousMode(boolean continuous)
+	{
+		// TODO
+	}
+
+	// MediaPlayer Callbacks
+
+	public void onBufferingUpdate(MediaPlayer player, int percent)
+	{
+		// TODO
+	}
+
+	public void onCompletion(MediaPlayer player)
+	{
+		// TODO
+	}
+
+	public boolean onError(MediaPlayer player, int what, int extra)
+	{
+		// TODO
+		return false;
+	}
+
+	public boolean onInfo(MediaPlayer player, int what, int extra)
+	{
+		// TODO
+		return false;
+	}
+
+	public void onPrepared(MediaPlayer player)
+	{
+		// TODO
+	}
+
+	public void onSeekComplete(MediaPlayer player)
 	{
 		// TODO
 	}
