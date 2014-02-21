@@ -2,6 +2,9 @@ package net.cjlucas.boombox;
 
 import android.media.MediaPlayer;
 
+import java.io.IOException;
+import java.net.URL;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,19 +22,124 @@ MediaPlayer.OnSeekCompleteListener
 {
 	private List<AudioDataProvider> providers;
 	private List<AudioDataProvider> playlist;
-	private int playlistCursor;
 	private List<MediaPlayer> players;
+	private List<ProviderProcessor> processors;
+	private int playlistCursor;
 	private boolean shuffleMode;
 	private boolean continuousMode;
 
+	private class ProviderProcessor extends Thread
+	{
+		private static final int BUFFER_SIZE = 64 * 1024;
+
+		private AudioDataProvider provider;
+		private ProxyServer proxyServer;
+		private boolean shouldHalt;
+
+		public ProviderProcessor(AudioDataProvider provider)
+		{
+			this.provider    = provider;
+			this.proxyServer = new ProxyServer();
+			this.shouldHalt  = false;
+
+			this.provider.prepare();
+
+			this.proxyServer.startServer();
+			this.proxyServer.start();
+
+			System.err.println( "Starting proxy server @ " + getProxyURL() );
+		}
+
+		public URL getProxyURL()
+		{
+			return this.proxyServer.getURL();
+		}
+
+		public AudioDataProvider getProvider()
+		{
+			return this.provider;
+		}
+
+		public void halt()
+		{
+			this.shouldHalt = true;
+		}
+
+		public void run()
+		{
+			// TODO: add a timeout mechanism
+			// wait for audioProc to connect
+			while ( !this.proxyServer.hasConnection() ) {
+				try { Thread.sleep(50); } catch (Exception e) {
+				}
+			}
+
+			while (!this.shouldHalt) {
+				byte[] buffer = new byte[BUFFER_SIZE];
+				int size = this.provider.onNeedData(buffer);
+
+				//				System.out.println("size received: " + size);
+
+				if (size > 0) {
+					this.proxyServer.sendData( shrinkBuffer(buffer, size) );
+				} else if (size == AudioDataProvider.STATUS_EOF_REACHED) {
+					System.out.println("EOF REACHED");
+					this.proxyServer.stopServer();
+					halt();
+				}
+
+			}
+		}
+
+		private byte[] shrinkBuffer(byte[] buffer, int size)
+		{
+			byte[] newBuffer = new byte[size];
+			for (int i = 0; i < size; i++) {
+				newBuffer[i] = buffer[i];
+			}
+
+			return newBuffer;
+		}
+	}
+
 	public Boombox()
 	{
-		this.providers      = Collections.synchronizedList( new ArrayList<AudioDataProvider>() );
-		this.playlist       = Collections.synchronizedList( new ArrayList<AudioDataProvider>() );
-		this.players        = Collections.synchronizedList( new ArrayList<MediaPlayer>() );
+		this.providers = Collections.synchronizedList(
+		        new ArrayList<AudioDataProvider>() );
+		this.playlist = Collections.synchronizedList(
+		        new ArrayList<AudioDataProvider>() );
+		this.players = Collections.synchronizedList(
+		        new ArrayList<MediaPlayer>() );
+		this.processors = Collections.synchronizedList(
+		        new ArrayList<ProviderProcessor>() );
 		this.playlistCursor = 0;
 		this.shuffleMode    = false;
 		this.continuousMode = false;
+	}
+
+	// Clean up
+
+	private void resetPlayers()
+	{
+		synchronized (this.players) {
+			for (MediaPlayer mp : this.players) {
+				mp.release();
+			}
+		}
+		this.players.clear();
+
+		synchronized (this.providers) {
+			for (ProviderProcessor pp : this.processors) {
+				pp.halt();
+				try {
+					pp.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		this.providers.clear();
 	}
 
 	// Providers Management
@@ -52,16 +160,6 @@ MediaPlayer.OnSeekCompleteListener
 		} else {
 			return newCursor;
 		}
-	}
-
-	public boolean hasNextProvider()
-	{
-		return getNextPlaylistCursor() != -1;
-	}
-
-	public boolean hasPreviousProvider()
-	{
-		return getPreviousPlaylistCursor() != -1;
 	}
 
 	public void addProvider(AudioDataProvider provider)
@@ -111,9 +209,13 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		MediaPlayer mp = getCurrentPlayer();
 
-		if (mp != null) {
-			mp.start();
+		// lazy load the media player
+		if (mp == null) {
+			ProviderProcessor pp = setupProcessor(getCurrentProvider(), true);
+			mp = queueMediaPlayer( pp.getProxyURL() );
 		}
+
+		mp.start();
 	}
 
 	public void pause()
@@ -133,6 +235,34 @@ MediaPlayer.OnSeekCompleteListener
 			play();
 		} else {
 			pause();
+		}
+	}
+
+	public boolean hasNext()
+	{
+		return getNextPlaylistCursor() != -1;
+	}
+
+	public boolean hasPrevious()
+	{
+		return getPreviousPlaylistCursor() != -1;
+	}
+
+	public void playNext()
+	{
+		if ( hasNext() ) {
+			resetPlayers();
+
+			this.playlistCursor = getNextPlaylistCursor();
+		}
+	}
+
+	public void playPrevious()
+	{
+		if ( hasPrevious() ) {
+			resetPlayers();
+
+			this.playlistCursor = getPreviousPlaylistCursor();
 		}
 	}
 
@@ -177,38 +307,85 @@ MediaPlayer.OnSeekCompleteListener
 		return player;
 	}
 
+
+	private MediaPlayer queueMediaPlayer(String dataSource)
+	{
+		MediaPlayer player = createMediaPlayer();
+		try {
+			player.setDataSource(dataSource);
+			player.prepare();
+		} catch (IOException e) {
+			// TODO: do something?
+		}
+		this.players.add(player);
+
+		int index = this.players.indexOf(player);
+		if (index > 0) {
+			this.players.get(index - 1).setNextMediaPlayer(player);
+		}
+
+		return player;
+	}
+
+	private MediaPlayer queueMediaPlayer(URL url)
+	{
+		return queueMediaPlayer( url.toString() );
+	}
+
+	private ProviderProcessor setupProcessor(AudioDataProvider provider,
+	                                         boolean           start)
+	{
+		ProviderProcessor pp = new ProviderProcessor(provider);
+		if (start) {
+			pp.start();
+		}
+
+		this.processors.add(pp);
+
+		return pp;
+	}
+
 	// MediaPlayer Callbacks
 
 	public void onBufferingUpdate(MediaPlayer player, int percent)
 	{
-		// TODO
+		String s = String.format("onBufferingUpdate player: %s, percent: %d",
+		                         player, percent);
+		System.err.println(s);
 	}
 
 	public void onCompletion(MediaPlayer player)
 	{
-		// TODO
+		String s = String.format("onCompletion player: %s", player);
+		System.err.println(s);
 	}
 
 	public boolean onError(MediaPlayer player, int what, int extra)
 	{
-		// TODO
+		String s = String.format("onInfo player: %s what: %d, extra: %d",
+		                         player, what, extra);
+		System.err.println(s);
 		return false;
 	}
 
 	public boolean onInfo(MediaPlayer player, int what, int extra)
 	{
-		// TODO
+		String s = String.format("onInfo player: %s what: %d, extra: %d",
+		                         player, what, extra);
+		System.err.println(s);
 		return false;
 	}
 
 	public void onPrepared(MediaPlayer player)
 	{
-		// TODO
+		String s = String.format("onPrepared player: %s", player);
+		System.err.println(s);
 	}
 
 	public void onSeekComplete(MediaPlayer player)
 	{
-		// TODO
+		String s = String.format("onSeekComplete player: %s", player);
+		System.err.println(s);
 	}
 
 }
