@@ -87,8 +87,10 @@ MediaPlayer.OnSeekCompleteListener
 					this.proxyServer.stopServer();
 					halt();
 				}
-
 			}
+
+			this.proxyServer.stopServer();
+			this.provider.release();
 		}
 
 		private byte[] shrinkBuffer(byte[] buffer, int size)
