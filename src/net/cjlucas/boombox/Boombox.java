@@ -1,6 +1,7 @@
 package net.cjlucas.boombox;
 
 import android.media.MediaPlayer;
+import android.util.Log;
 
 import java.io.IOException;
 import java.net.URL;
@@ -8,6 +9,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +24,8 @@ MediaPlayer.OnInfoListener,
 MediaPlayer.OnPreparedListener,
 MediaPlayer.OnSeekCompleteListener
 {
+	private static final String TAG = "Boombox";
+
 	private List<AudioDataProvider> providers;
 	private List<AudioDataProvider> playlist;
 	private List<MediaPlayer> players;
@@ -30,83 +34,6 @@ MediaPlayer.OnSeekCompleteListener
 	private int playlistCursor;
 	private boolean shuffleMode;
 	private boolean continuousMode;
-
-	private class ProviderProcessor extends Thread
-	{
-		private static final int BUFFER_SIZE = 64 * 1024;
-
-		private AudioDataProvider provider;
-		private ProxyServer proxyServer;
-		private boolean shouldHalt;
-
-		public ProviderProcessor(AudioDataProvider provider)
-		{
-			this.provider    = provider;
-			this.proxyServer = new ProxyServer();
-			this.shouldHalt  = false;
-
-			this.provider.prepare();
-			this.proxyServer.setContentLength( this.provider.getLength() );
-
-			this.proxyServer.startServer();
-			this.proxyServer.start();
-
-			System.err.println( "Starting proxy server @ " + getProxyURL() );
-		}
-
-		public URL getProxyURL()
-		{
-			return this.proxyServer.getURL();
-		}
-
-		public AudioDataProvider getProvider()
-		{
-			return this.provider;
-		}
-
-		public void halt()
-		{
-			this.shouldHalt = true;
-		}
-
-		public void run()
-		{
-			// TODO: add a timeout mechanism
-			// wait for audioProc to connect
-			while ( !this.proxyServer.hasConnection() ) {
-				try { Thread.sleep(50); } catch (Exception e) {
-				}
-			}
-
-			while (!this.shouldHalt) {
-				byte[] buffer = new byte[BUFFER_SIZE];
-				int size = this.provider.provideData(buffer);
-				//				System.out.println("size received: " + size);
-
-				if (size > 0) {
-					this.proxyServer.sendData( shrinkBuffer(buffer, size) );
-				} else if (size == AudioDataProvider.STATUS_EOF_REACHED) {
-					System.out.println("EOF REACHED");
-					this.proxyServer.stopServer();
-					halt();
-				}
-			}
-
-			this.proxyServer.stopServer();
-			this.provider.release();
-			releaseProcessor(this);
-		}
-
-		private byte[] shrinkBuffer(byte[] buffer, int size)
-		{
-			byte[] newBuffer = new byte[size];
-			for (int i = 0; i < size; i++) {
-				newBuffer[i] = buffer[i];
-			}
-
-			return newBuffer;
-		}
-	}
 
 	public Boombox()
 	{
@@ -254,7 +181,7 @@ MediaPlayer.OnSeekCompleteListener
 			mp.setDataSource( pp.getProxyURL().toString() );
 			mp.prepareAsync();
 		} catch (IOException e) {
-			System.err.println("queueProvider failed");
+			loge("queueProvider failed", e);
 			return;
 		}
 
@@ -375,9 +302,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	public void onBufferingUpdate(MediaPlayer player, int percent)
 	{
-		String s = String.format("onBufferingUpdate player: %s, percent: %d",
-		                         player, percent);
-		System.err.println(s);
+		logi("onBufferingUpdate player: %s, percent: %d", player, percent);
 
 		MediaPlayer tailPlayer = this.players.get(this.players.size() - 1);
 
@@ -393,18 +318,17 @@ MediaPlayer.OnSeekCompleteListener
 		     && player == tailPlayer
 		     && nextProvider != null
 		     ) {
-			System.out.println("queueing the next provider");
+			logi("queueing the next provider");
 			queueProvider(nextProvider);
 		}
 	}
 
 	public void onCompletion(MediaPlayer player)
 	{
-		String s = String.format("onCompletion player: %s", player);
-		System.err.println(s);
+		logi("onCompletion player: %s", player);
 
 		/*
-		 * TODO: In the case of having the next media player being buffered
+		* TODO: In the case of having the next media player being buffered
 		* at this point, we need to queue up another media player
 		 */
 
@@ -413,9 +337,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	public boolean onError(MediaPlayer player, int what, int extra)
 	{
-		String s = String.format("onInfo player: %s what: %d, extra: %d",
-		                         player, what, extra);
-		System.err.println(s);
+		logi("onInfo player: %s what: %d, extra: %d", player, what, extra);
 
 		// TODO: error handling
 		return false;
@@ -423,9 +345,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	public boolean onInfo(MediaPlayer player, int what, int extra)
 	{
-		String s = String.format("onInfo player: %s what: %d, extra: %d",
-		                         player, what, extra);
-		System.err.println(s);
+		logi("onInfo player: %s what: %d, extra: %d", player, what, extra);
 
 		// TODO: info handling
 		return false;
@@ -433,8 +353,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	public void onPrepared(MediaPlayer player)
 	{
-		String s = String.format("onPrepared player: %s", player);
-		System.err.println(s);
+		logi("onPrepared player: %s", player);
 
 		/*
 		 * If given player is at the head of the list, immediately start
@@ -450,7 +369,115 @@ MediaPlayer.OnSeekCompleteListener
 
 	public void onSeekComplete(MediaPlayer player)
 	{
-		String s = String.format("onSeekComplete player: %s", player);
-		System.err.println(s);
+		logi("onSeekComplete player: %s", player);
+	}
+
+	// Log helpers
+
+	private void loge(String fmt, Object ... args)
+	{
+		Log.e( TAG, String.format(Locale.getDefault(), fmt, args) );
+	}
+
+	@SuppressWarnings("unused")
+	private void logv(String fmt, Object ... args)
+	{
+		Log.v( TAG, String.format(Locale.getDefault(), fmt, args) );
+	}
+
+	@SuppressWarnings("unused")
+	private void logd(String fmt, Object ... args)
+	{
+		Log.d( TAG, String.format(Locale.getDefault(), fmt, args) );
+	}
+
+	@SuppressWarnings("unused")
+	private void logw(String fmt, Object ... args)
+	{
+		Log.w( TAG, String.format(Locale.getDefault(), fmt, args) );
+	}
+
+	private void logi(String fmt, Object ... args)
+	{
+		Log.i( TAG, String.format(Locale.getDefault(), fmt, args) );
+	}
+
+	// Nested classes
+
+	private class ProviderProcessor extends Thread
+	{
+		private static final int BUFFER_SIZE = 64 * 1024;
+
+		private AudioDataProvider provider;
+		private ProxyServer proxyServer;
+		private boolean shouldHalt;
+
+		public ProviderProcessor(AudioDataProvider provider)
+		{
+			this.provider    = provider;
+			this.proxyServer = new ProxyServer();
+			this.shouldHalt  = false;
+
+			this.provider.prepare();
+			this.proxyServer.setContentLength( this.provider.getLength() );
+
+			this.proxyServer.startServer();
+			this.proxyServer.start();
+
+			logi( "Starting proxy server @ " + getProxyURL() );
+		}
+
+		public URL getProxyURL()
+		{
+			return this.proxyServer.getURL();
+		}
+
+		public AudioDataProvider getProvider()
+		{
+			return this.provider;
+		}
+
+		public void halt()
+		{
+			this.shouldHalt = true;
+		}
+
+		public void run()
+		{
+			// TODO: add a timeout mechanism
+			// wait for audioProc to connect
+			while ( !this.proxyServer.hasConnection() ) {
+				try { Thread.sleep(50); } catch (Exception e) {
+				}
+			}
+
+			while (!this.shouldHalt) {
+				byte[] buffer = new byte[BUFFER_SIZE];
+				int size = this.provider.provideData(buffer);
+				//				System.out.println("size received: " + size);
+
+				if (size > 0) {
+					this.proxyServer.sendData( shrinkBuffer(buffer, size) );
+				} else if (size == AudioDataProvider.STATUS_EOF_REACHED) {
+					logi("ProviderProcessor: EOF reached");
+					this.proxyServer.stopServer();
+					halt();
+				}
+			}
+
+			this.proxyServer.stopServer();
+			this.provider.release();
+			releaseProcessor(this);
+		}
+
+		private byte[] shrinkBuffer(byte[] buffer, int size)
+		{
+			byte[] newBuffer = new byte[size];
+			for (int i = 0; i < size; i++) {
+				newBuffer[i] = buffer[i];
+			}
+
+			return newBuffer;
+		}
 	}
 }
