@@ -142,6 +142,12 @@ MediaPlayer.OnSeekCompleteListener
 		this.providers.clear();
 	}
 
+	private void releasePlayer(MediaPlayer player)
+	{
+		player.release();
+		this.players.remove(player);
+	}
+
 	// Providers Management
 
 	private int getNextPlaylistCursor()
