@@ -242,7 +242,7 @@ MediaPlayer.OnSeekCompleteListener
 		ProviderProcessor pp = new ProviderProcessor(provider);
 		pp.start();
 
-		MediaPlayer mp = createMediaPlayer();
+		MediaPlayer mp = new MediaPlayer();
 		mp.setOnBufferingUpdateListener(this);
 		mp.setOnCompletionListener(this);
 		mp.setOnErrorListener(this);
@@ -259,8 +259,8 @@ MediaPlayer.OnSeekCompleteListener
 		}
 
 		this.processors.add(pp);
-		this.players.add(player);
-		this.playerProviderMap.put(player, pp);
+		this.players.add(mp);
+		this.playerProviderMap.put(mp, provider);
 	}
 
 	// Playback Controls
