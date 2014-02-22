@@ -8,6 +8,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.cjlucas.boombox.provider.AudioDataProvider;
 
@@ -24,6 +26,7 @@ MediaPlayer.OnSeekCompleteListener
 	private List<AudioDataProvider> playlist;
 	private List<MediaPlayer> players;
 	private List<ProviderProcessor> processors;
+	private Map<MediaPlayer, AudioDataProvider> playerProviderMap;
 	private int playlistCursor;
 	private boolean shuffleMode;
 	private boolean continuousMode;
@@ -114,9 +117,10 @@ MediaPlayer.OnSeekCompleteListener
 		        new ArrayList<MediaPlayer>() );
 		this.processors = Collections.synchronizedList(
 		        new ArrayList<ProviderProcessor>() );
-		this.playlistCursor = 0;
-		this.shuffleMode    = false;
-		this.continuousMode = false;
+		this.playerProviderMap = new ConcurrentHashMap<MediaPlayer, AudioDataProvider>();
+		this.playlistCursor    = 0;
+		this.shuffleMode       = false;
+		this.continuousMode    = false;
 	}
 
 	// Clean up
@@ -148,30 +152,41 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		player.release();
 		this.players.remove(player);
+		this.playerProviderMap.remove(player);
 	}
 
 	// Providers Management
 
-	private int getNextPlaylistCursor()
+	private int getFollowingPlaylistIndex(int index)
 	{
-		int newCursor = this.playlistCursor + 1;
+		int newIndex = index + 1;
 
-		if ( !this.continuousMode && newCursor >= this.playlist.size() ) {
+		if ( !this.continuousMode && newIndex >= this.playlist.size() ) {
 			return -1;
 		}
 
-		return newCursor % this.playlist.size();
+		return newIndex % this.playlist.size();
+	}
+
+	private int getNextPlaylistCursor()
+	{
+		return getFollowingPlaylistIndex(this.playlistCursor);
+	}
+
+	private int getPrecedingPlaylistIndex(int index)
+	{
+		int newIndex = index - 1;
+
+		if (newIndex < 0) {
+			return this.continuousMode ? this.playlist.size() - 1 : -1;
+		} else {
+			return newIndex;
+		}
 	}
 
 	private int getPreviousPlaylistCursor()
 	{
-		int newCursor = this.playlistCursor - 1;
-
-		if (newCursor < 0) {
-			return this.continuousMode ? this.playlist.size() - 1 : -1;
-		} else {
-			return newCursor;
-		}
+		return getPrecedingPlaylistIndex(this.playlistCursor);
 	}
 
 	public void addProvider(AudioDataProvider provider)
@@ -209,6 +224,13 @@ MediaPlayer.OnSeekCompleteListener
 		return new ArrayList<AudioDataProvider>(this.playlist);
 	}
 
+	private AudioDataProvider getProviderAfter(AudioDataProvider provider)
+	{
+		int nextIndex = getFollowingPlaylistIndex(
+		        this.playlist.indexOf(provider) );
+		return nextIndex == -1 ? null : this.playlist.get(nextIndex);
+	}
+
 	// Playback Controls
 
 	private boolean hasCurrentPlayer()
@@ -233,8 +255,7 @@ MediaPlayer.OnSeekCompleteListener
 
 		// lazy load the media player
 		if (mp == null) {
-			ProviderProcessor pp = setupProcessor(getCurrentProvider(), true);
-			mp = queueMediaPlayer( pp.getProxyURL() );
+			queueProvider( getCurrentProvider() );
 
 			// start is called by the onPrepared listener
 		} else {
@@ -356,7 +377,8 @@ MediaPlayer.OnSeekCompleteListener
 	private void queueProvider(AudioDataProvider provider)
 	{
 		ProviderProcessor pp = setupProcessor(provider, true);
-		queueMediaPlayer( pp.getProxyURL() );
+		MediaPlayer mp       = queueMediaPlayer( pp.getProxyURL() );
+		this.playerProviderMap.put(mp, provider);
 	}
 
 	private ProviderProcessor setupProcessor(AudioDataProvider provider,
@@ -380,11 +402,17 @@ MediaPlayer.OnSeekCompleteListener
 		                         player, percent);
 		System.err.println(s);
 
+		MediaPlayer tailPlayer = this.players.get(this.players.size() - 1);
+
+		AudioDataProvider tailPlayerProvider = this.playerProviderMap.get(tailPlayer);
+		AudioDataProvider nextProvider       = getProviderAfter(tailPlayerProvider);
+
 		if ( percent == 100
-		     && player == this.players.get(this.players.size() - 1)
-		     && hasNext() ) {
+		     && player == tailPlayer
+		     && nextProvider != null
+		     ) {
 			System.out.println("queueing the next provider");
-			queueProvider( getNextProvider() );
+			queueProvider(nextProvider);
 			/*
 			 * TODO: queue up the next data source
 			 *
@@ -400,6 +428,11 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		String s = String.format("onCompletion player: %s", player);
 		System.err.println(s);
+
+		/*
+		 * TODO: In the case of having the next media player being buffered
+		* at this point, we need to queue up another media player
+		 */
 
 		releasePlayer(player);
 	}
