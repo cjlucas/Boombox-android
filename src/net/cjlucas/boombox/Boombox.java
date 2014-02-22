@@ -45,10 +45,11 @@ MediaPlayer.OnSeekCompleteListener
 		        new ArrayList<MediaPlayer>() );
 		this.processors = Collections.synchronizedList(
 		        new ArrayList<ProviderProcessor>() );
-		this.playerProviderMap = new ConcurrentHashMap<MediaPlayer, AudioDataProvider>();
-		this.playlistCursor    = 0;
-		this.shuffleMode       = false;
-		this.continuousMode    = false;
+		this.playerProviderMap =
+		        new ConcurrentHashMap<MediaPlayer, AudioDataProvider>();
+		this.playlistCursor = 0;
+		this.shuffleMode    = false;
+		this.continuousMode = false;
 	}
 
 	// Clean up
@@ -296,6 +297,24 @@ MediaPlayer.OnSeekCompleteListener
 	public boolean isContinuousModeEnabled()
 	{
 		return this.continuousMode;
+	}
+
+	public int getCurrentPosition()
+	{
+		MediaPlayer mp = getCurrentPlayer();
+
+		return mp == null ? 0 : mp.getCurrentPosition();
+	}
+
+	public int getDuration()
+	{
+		MediaPlayer mp = getCurrentPlayer();
+
+		if (mp == null || mp.getDuration() == -1) {
+			return (int)getCurrentProvider().getDuration();
+		}
+
+		return mp.getDuration();
 	}
 
 	// MediaPlayer Callbacks
