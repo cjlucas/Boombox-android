@@ -219,9 +219,11 @@ MediaPlayer.OnSeekCompleteListener
 		if (mp == null) {
 			ProviderProcessor pp = setupProcessor(getCurrentProvider(), true);
 			mp = queueMediaPlayer( pp.getProxyURL() );
-		}
 
-		mp.start();
+			// start is called by the onPrepared listener
+		} else {
+			mp.start();
+		}
 	}
 
 	public void pause()
@@ -313,13 +315,12 @@ MediaPlayer.OnSeekCompleteListener
 		return player;
 	}
 
-
 	private MediaPlayer queueMediaPlayer(String dataSource)
 	{
 		MediaPlayer player = createMediaPlayer();
 		try {
 			player.setDataSource(dataSource);
-			player.prepare();
+			player.prepareAsync();
 		} catch (IOException e) {
 			// TODO: do something?
 		}
@@ -358,12 +359,25 @@ MediaPlayer.OnSeekCompleteListener
 		String s = String.format("onBufferingUpdate player: %s, percent: %d",
 		                         player, percent);
 		System.err.println(s);
+
+		if (percent == 100) {
+			/*
+			 * TODO: queue up the next data source
+			 *
+			 * note: this method gets called multiple times
+			 * even after percent reaches 100%. So ensure
+			 * we don't blindly queue up data sources
+			 * everytime this block is reached
+			 */
+		}
 	}
 
 	public void onCompletion(MediaPlayer player)
 	{
 		String s = String.format("onCompletion player: %s", player);
 		System.err.println(s);
+
+		releasePlayer(player);
 	}
 
 	public boolean onError(MediaPlayer player, int what, int extra)
@@ -371,6 +385,8 @@ MediaPlayer.OnSeekCompleteListener
 		String s = String.format("onInfo player: %s what: %d, extra: %d",
 		                         player, what, extra);
 		System.err.println(s);
+
+		// TODO: error handling
 		return false;
 	}
 
@@ -379,6 +395,8 @@ MediaPlayer.OnSeekCompleteListener
 		String s = String.format("onInfo player: %s what: %d, extra: %d",
 		                         player, what, extra);
 		System.err.println(s);
+
+		// TODO: info handling
 		return false;
 	}
 
@@ -386,6 +404,8 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		String s = String.format("onPrepared player: %s", player);
 		System.err.println(s);
+
+		player.start();
 	}
 
 	public void onSeekComplete(MediaPlayer player)
