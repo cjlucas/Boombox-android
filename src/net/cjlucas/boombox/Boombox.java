@@ -231,6 +231,32 @@ MediaPlayer.OnSeekCompleteListener
 		return nextIndex == -1 ? null : this.playlist.get(nextIndex);
 	}
 
+	private void queueProvider(AudioDataProvider provider)
+	{
+		ProviderProcessor pp = new ProviderProcessor(provider);
+		pp.start();
+
+		MediaPlayer mp = createMediaPlayer();
+		mp.setOnBufferingUpdateListener(this);
+		mp.setOnCompletionListener(this);
+		mp.setOnErrorListener(this);
+		mp.setOnInfoListener(this);
+		mp.setOnPreparedListener(this);
+		mp.setOnSeekCompleteListener(this);
+
+		try {
+			mp.setDataSource( pp.getProxyURL().toString() );
+			mp.prepareAsync();
+		} catch (IOException e) {
+			System.err.println("queueProvider failed");
+			return;
+		}
+
+		this.processors.add(pp);
+		this.players.add(player);
+		this.playerProviderMap.put(player, pp);
+	}
+
 	// Playback Controls
 
 	private boolean hasCurrentPlayer()
@@ -339,61 +365,6 @@ MediaPlayer.OnSeekCompleteListener
 		return this.continuousMode;
 	}
 
-	// Helpers
-
-	private MediaPlayer createMediaPlayer()
-	{
-		MediaPlayer player = new MediaPlayer();
-		player.setOnBufferingUpdateListener(this);
-		player.setOnCompletionListener(this);
-		player.setOnErrorListener(this);
-		player.setOnInfoListener(this);
-		player.setOnPreparedListener(this);
-		player.setOnSeekCompleteListener(this);
-
-		return player;
-	}
-
-	private MediaPlayer queueMediaPlayer(String dataSource)
-	{
-		MediaPlayer player = createMediaPlayer();
-		try {
-			player.setDataSource(dataSource);
-			player.prepareAsync();
-		} catch (IOException e) {
-			// TODO: do something?
-		}
-		this.players.add(player);
-
-
-		return player;
-	}
-
-	private MediaPlayer queueMediaPlayer(URL url)
-	{
-		return queueMediaPlayer( url.toString() );
-	}
-
-	private void queueProvider(AudioDataProvider provider)
-	{
-		ProviderProcessor pp = setupProcessor(provider, true);
-		MediaPlayer mp       = queueMediaPlayer( pp.getProxyURL() );
-		this.playerProviderMap.put(mp, provider);
-	}
-
-	private ProviderProcessor setupProcessor(AudioDataProvider provider,
-	                                         boolean           start)
-	{
-		ProviderProcessor pp = new ProviderProcessor(provider);
-		if (start) {
-			pp.start();
-		}
-
-		this.processors.add(pp);
-
-		return pp;
-	}
-
 	// MediaPlayer Callbacks
 
 	public void onBufferingUpdate(MediaPlayer player, int percent)
@@ -407,20 +378,17 @@ MediaPlayer.OnSeekCompleteListener
 		AudioDataProvider tailPlayerProvider = this.playerProviderMap.get(tailPlayer);
 		AudioDataProvider nextProvider       = getProviderAfter(tailPlayerProvider);
 
+		/*
+		 * This method gets called multiple times even after it reaches 100%,
+		 * so we ensure we don't blindly queue up data sources everytime this
+		 * block is reached.
+		 */
 		if ( percent == 100
 		     && player == tailPlayer
 		     && nextProvider != null
 		     ) {
 			System.out.println("queueing the next provider");
 			queueProvider(nextProvider);
-			/*
-			 * TODO: queue up the next data source
-			 *
-			 * note: this method gets called multiple times
-			 * even after percent reaches 100%. So ensure
-			 * we don't blindly queue up data sources
-			 * everytime this block is reached
-			 */
 		}
 	}
 
@@ -479,5 +447,4 @@ MediaPlayer.OnSeekCompleteListener
 		String s = String.format("onSeekComplete player: %s", player);
 		System.err.println(s);
 	}
-
 }
