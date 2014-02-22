@@ -14,6 +14,7 @@ public class ProxyServer extends Thread
 	private int port;
 	private ServerSocket serverSocket;
 	private DataForwarder currentForwarder;
+	private long contentLength;
 	private boolean running;
 
 	private class DataForwarder extends Thread
@@ -80,6 +81,11 @@ public class ProxyServer extends Thread
 		return this.serverSocket.getLocalPort();
 	}
 
+	public void setContentLength(long contentLength)
+	{
+		this.contentLength = contentLength;
+	}
+
 	public boolean hasConnection()
 	{
 		return this.currentForwarder != null;
@@ -103,13 +109,13 @@ public class ProxyServer extends Thread
 		while (this.running) {
 			Socket s = accept();
 			System.out.println("ProxyServer: got a connection!");
-			String ok = "HTTP/1.1 200 OK\r\n\r\n";
-			try {
-				s.getOutputStream().write( ok.getBytes(), 0, ok.length() );
-			} catch (IOException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
+			write(s, "HTTP/1.1 200 OK\r\n");
+			if (this.contentLength > 0) {
+				write(s, "Content-Length: " + this.contentLength + "\r\n");
 			}
+
+			write(s, "\r\n");
+
 			try {
 				InputStreamReader inStream = new InputStreamReader( s.getInputStream() );
 
@@ -138,6 +144,16 @@ public class ProxyServer extends Thread
 		}
 
 		tearDown();
+	}
+
+	private void write(Socket s, String str)
+	{
+		try {
+			System.out.println("ProxyServer: writing: " + str);
+			s.getOutputStream().write( str.getBytes(), 0, str.length() );
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void run()

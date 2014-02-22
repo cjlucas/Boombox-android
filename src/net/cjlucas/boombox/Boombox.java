@@ -43,6 +43,7 @@ MediaPlayer.OnSeekCompleteListener
 			this.shouldHalt  = false;
 
 			this.provider.prepare();
+			this.proxyServer.setContentLength( this.provider.getLength() );
 
 			this.proxyServer.startServer();
 			this.proxyServer.start();
@@ -77,7 +78,6 @@ MediaPlayer.OnSeekCompleteListener
 			while (!this.shouldHalt) {
 				byte[] buffer = new byte[BUFFER_SIZE];
 				int size = this.provider.provideData(buffer);
-
 				//				System.out.println("size received: " + size);
 
 				if (size > 0) {
