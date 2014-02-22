@@ -344,10 +344,6 @@ MediaPlayer.OnSeekCompleteListener
 		}
 		this.players.add(player);
 
-		int index = this.players.indexOf(player);
-		if (index > 0) {
-			this.players.get(index - 1).setNextMediaPlayer(player);
-		}
 
 		return player;
 	}
@@ -355,6 +351,12 @@ MediaPlayer.OnSeekCompleteListener
 	private MediaPlayer queueMediaPlayer(URL url)
 	{
 		return queueMediaPlayer( url.toString() );
+	}
+
+	private void queueProvider(AudioDataProvider provider)
+	{
+		ProviderProcessor pp = setupProcessor(provider, true);
+		queueMediaPlayer( pp.getProxyURL() );
 	}
 
 	private ProviderProcessor setupProcessor(AudioDataProvider provider,
@@ -378,7 +380,11 @@ MediaPlayer.OnSeekCompleteListener
 		                         player, percent);
 		System.err.println(s);
 
-		if (percent == 100) {
+		if ( percent == 100
+		     && player == this.players.get(this.players.size() - 1)
+		     && hasNext() ) {
+			System.out.println("queueing the next provider");
+			queueProvider( getNextProvider() );
 			/*
 			 * TODO: queue up the next data source
 			 *
@@ -423,7 +429,16 @@ MediaPlayer.OnSeekCompleteListener
 		String s = String.format("onPrepared player: %s", player);
 		System.err.println(s);
 
-		player.start();
+		/*
+		 * If given player is at the head of the list, immediately start
+		 * playing. Otherwise, queue the player to the tail.
+		 */
+		int index = this.players.indexOf(player);
+		if (index == 0) {
+			player.start();
+		} else {
+			this.players.get(index - 1).setNextMediaPlayer(player);
+		}
 	}
 
 	public void onSeekComplete(MediaPlayer player)
