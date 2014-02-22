@@ -76,7 +76,7 @@ MediaPlayer.OnSeekCompleteListener
 
 			while (!this.shouldHalt) {
 				byte[] buffer = new byte[BUFFER_SIZE];
-				int size = this.provider.onNeedData(buffer);
+				int size = this.provider.provideData(buffer);
 
 				//				System.out.println("size received: " + size);
 
