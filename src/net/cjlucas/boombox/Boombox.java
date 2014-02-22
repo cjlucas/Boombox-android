@@ -156,7 +156,11 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		int newCursor = this.playlistCursor + 1;
 
-		return this.continuousMode ? newCursor % this.playlist.size() : -1;
+		if ( !this.continuousMode && newCursor >= this.playlist.size() ) {
+			return -1;
+		}
+
+		return newCursor % this.playlist.size();
 	}
 
 	private int getPreviousPlaylistCursor()
@@ -274,6 +278,7 @@ MediaPlayer.OnSeekCompleteListener
 			resetPlayers();
 
 			this.playlistCursor = getNextPlaylistCursor();
+			play();
 		}
 	}
 
@@ -283,6 +288,7 @@ MediaPlayer.OnSeekCompleteListener
 			resetPlayers();
 
 			this.playlistCursor = getPreviousPlaylistCursor();
+			play();
 		}
 	}
 
