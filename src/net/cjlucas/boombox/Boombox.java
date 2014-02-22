@@ -193,6 +193,16 @@ MediaPlayer.OnSeekCompleteListener
 		return prevCursor == -1 ? null : this.playlist.get(prevCursor);
 	}
 
+	public List<AudioDataProvider> getProviders()
+	{
+		return new ArrayList<AudioDataProvider>(this.providers);
+	}
+
+	public List<AudioDataProvider> getPlaylist()
+	{
+		return new ArrayList<AudioDataProvider>(this.playlist);
+	}
+
 	// Playback Controls
 
 	private boolean hasCurrentPlayer()
