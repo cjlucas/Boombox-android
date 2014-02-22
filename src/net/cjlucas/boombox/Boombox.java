@@ -94,6 +94,7 @@ MediaPlayer.OnSeekCompleteListener
 
 			this.proxyServer.stopServer();
 			this.provider.release();
+			releaseProcessor(this);
 		}
 
 		private byte[] shrinkBuffer(byte[] buffer, int size)
@@ -146,6 +147,11 @@ MediaPlayer.OnSeekCompleteListener
 		}
 
 		this.providers.clear();
+	}
+
+	private void releaseProcessor(ProviderProcessor pp)
+	{
+		this.processors.remove(pp);
 	}
 
 	private void releasePlayer(MediaPlayer player)
