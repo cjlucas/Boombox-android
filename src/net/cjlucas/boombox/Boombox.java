@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.cjlucas.boombox.provider.AudioDataProvider;
@@ -96,6 +97,26 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		pp.halt();
 		this.processors.remove(pp);
+	}
+
+	private void releaseProcessor(AudioDataProvider provider)
+	{
+		if (provider == null) {
+			return;
+		}
+
+		ProviderProcessor ppToRemove = null;
+
+		synchronized (this.processors) {
+			for (ProviderProcessor pp : this.processors) {
+				if (pp.getProvider() == provider) {
+					ppToRemove = pp;
+					break;
+				}
+			}
+		}
+
+		releaseProcessor(ppToRemove);
 	}
 
 	private void releasePlayer(MediaPlayer player)
@@ -297,14 +318,70 @@ MediaPlayer.OnSeekCompleteListener
 		}
 	}
 
+	private void shufflePlaylist()
+	{
+		AudioDataProvider currentProvider = null;
+
+		// release queued players
+		if (this.players.size() > 0) {
+			this.players.get(0).setNextMediaPlayer(null);
+			for (int i = 1; i < this.players.size(); i++) {
+				releasePlayer( this.players.get(i) );
+			}
+
+			currentProvider = this.playerProviderMap.get( this.players.get(0) );
+		}
+
+		synchronized (this.playlist) {
+			List<AudioDataProvider> providers =
+			        new ArrayList<AudioDataProvider>(this.providers);
+
+			this.playlist.clear();
+
+			// put current provider at the top of the shuffled playlist
+			if (currentProvider != null) {
+				this.playlist.add(currentProvider);
+				providers.remove(currentProvider);
+			}
+
+			Random random = new Random();
+			for (int i = 0; i < providers.size(); i++) {
+				int index = random.nextInt( providers.size() );
+
+				AudioDataProvider p = providers.get(index);
+				this.playlist.add(p);
+				providers.remove(p);
+			}
+		}
+
+		this.playlistCursor = 0;
+	}
+
+	private void resetPlaylist()
+	{
+		AudioDataProvider currentProvider = getCurrentProvider();
+		this.playlist.clear();
+		logi( "provider size: %d", this.providers.size() );
+
+		for (AudioDataProvider provider : this.providers) {
+			this.playlist.add(provider);
+		}
+
+		logi( "playlist size %d", this.playlist.size() );
+
+		this.playlistCursor = this.playlist.indexOf(currentProvider);
+	}
+
 	public void setShuffleMode(boolean shuffle)
 	{
 		boolean oldMode = isShuffleModeEnabled();
 		this.shuffleMode = shuffle;
 
 		// prevent reshuffling if already shuffled
-		if (oldMode == false) {
-			// do some shuffling
+		if ( oldMode == false && isShuffleModeEnabled() ) {
+			shufflePlaylist();
+		} else if ( oldMode == true && !isShuffleModeEnabled() ) {
+			resetPlaylist();
 		}
 	}
 
