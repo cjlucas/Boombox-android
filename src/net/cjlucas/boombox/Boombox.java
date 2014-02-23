@@ -360,13 +360,12 @@ MediaPlayer.OnSeekCompleteListener
 		 * so we ensure we don't blindly queue up data sources everytime this
 		 * block is reached.
 		 */
-		if ( percent == 100
-		     && player == tailPlayer
-		     && nextProvider != null
-		     ) {
+		if (percent == 100 && player == tailPlayer && nextProvider != null) {
 			logi("queueing the next provider");
 			queueProvider(nextProvider);
 		}
+
+		notifyBufferingUpdate(this.playerProviderMap.get(player), percent);
 	}
 
 	public void onCompletion(MediaPlayer player)
@@ -449,6 +448,15 @@ MediaPlayer.OnSeekCompleteListener
 		} else {
 			notifyPlaybackStart(nextProvider);
 		}
+	}
+
+	private void notifyBufferingUpdate(AudioDataProvider provider, int percent)
+	{
+		if (this.infoListener == null) {
+			return;
+		}
+
+		this.infoListener.onBufferingUpdate(this, provider, percent);
 	}
 
 	// Log helpers
