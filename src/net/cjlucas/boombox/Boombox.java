@@ -89,7 +89,7 @@ MediaPlayer.OnSeekCompleteListener
 			}
 		}
 
-		this.providers.clear();
+		this.processors.clear();
 	}
 
 	private void releaseProcessor(ProviderProcessor pp)
