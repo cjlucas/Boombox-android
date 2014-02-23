@@ -22,7 +22,7 @@ public class AudioFileDataProvider extends AudioDataProvider
 
 	public AudioFileDataProvider(File file)
 	{
-		this(file, null);
+		this( file, file.getName() );
 	}
 
 	@Override
@@ -34,7 +34,7 @@ public class AudioFileDataProvider extends AudioDataProvider
 				ext.setDataSource( this.file.getAbsolutePath() );
 
 				MediaFormat mf = ext.getTrackFormat(0);
-				this.duration = mf.getLong(MediaFormat.KEY_DURATION);
+				this.duration = mf.getLong(MediaFormat.KEY_DURATION) / 1000;
 			} catch (IOException e) {
 			}
 
