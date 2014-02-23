@@ -352,6 +352,9 @@ MediaPlayer.OnSeekCompleteListener
 		 */
 
 		releasePlayer(player);
+
+		// update playlist cursor, or reset if playlist is complete
+		this.playlistCursor = Math.max( 0, getNextPlaylistCursor() );
 	}
 
 	public boolean onError(MediaPlayer player, int what, int extra)
