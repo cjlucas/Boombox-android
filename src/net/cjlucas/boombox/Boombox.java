@@ -31,7 +31,11 @@ MediaPlayer.OnSeekCompleteListener
 	private List<MediaPlayer> players;
 	private List<ProviderProcessor> processors;
 	private Map<MediaPlayer, AudioDataProvider> playerProviderMap;
+
 	private int playlistCursor;
+
+	private BoomboxInfoListener infoListener;
+
 	private boolean shuffleMode;
 	private boolean continuousMode;
 
@@ -50,6 +54,17 @@ MediaPlayer.OnSeekCompleteListener
 		this.playlistCursor = 0;
 		this.shuffleMode    = false;
 		this.continuousMode = false;
+	}
+
+	public Boombox(BoomboxInfoListener infoListener)
+	{
+		this();
+		setInfoListener(infoListener);
+	}
+
+	public void setInfoListener(BoomboxInfoListener infoListener)
+	{
+		this.infoListener = infoListener;
 	}
 
 	// Clean up
@@ -131,7 +146,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	public AudioDataProvider getCurrentProvider()
 	{
-		return this.playlist.get(playlistCursor);
+		return this.playlist.get(this.playlistCursor);
 	}
 
 	public AudioDataProvider getNextProvider()
@@ -351,6 +366,7 @@ MediaPlayer.OnSeekCompleteListener
 		* at this point, we need to queue up another media player
 		 */
 
+		notifyPlaybackCompletion(player);
 		releasePlayer(player);
 
 		// update playlist cursor, or reset if playlist is complete
@@ -361,7 +377,6 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		logi("onInfo player: %s what: %d, extra: %d", player, what, extra);
 
-		// TODO: error handling
 		return false;
 	}
 
@@ -369,7 +384,6 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		logi("onInfo player: %s what: %d, extra: %d", player, what, extra);
 
-		// TODO: info handling
 		return false;
 	}
 
@@ -384,6 +398,7 @@ MediaPlayer.OnSeekCompleteListener
 		int index = this.players.indexOf(player);
 		if (index == 0) {
 			player.start();
+			notifyPlaybackStart( this.playerProviderMap.get(player) );
 		} else {
 			this.players.get(index - 1).setNextMediaPlayer(player);
 		}
@@ -392,6 +407,44 @@ MediaPlayer.OnSeekCompleteListener
 	public void onSeekComplete(MediaPlayer player)
 	{
 		logi("onSeekComplete player: %s", player);
+	}
+
+	// BoomboxInfoListener helpers
+
+	private void notifyPlaybackStart(AudioDataProvider provider)
+	{
+		if (this.infoListener == null) {
+			return;
+		}
+
+		this.infoListener.onPlaybackStart( this, provider);
+	}
+
+	/**
+	 * Helper for notifying BoomboxInfoListener about playback status.
+	 *
+	 * This must be called before playbackCursor is updated.
+	 */
+	private void notifyPlaybackCompletion(MediaPlayer mp)
+	{
+		if (this.infoListener == null) {
+			return;
+		}
+
+		AudioDataProvider nextProvider = getNextProvider();
+		this.infoListener.onPlaybackCompletion(this,
+		                                       getCurrentProvider(),
+		                                       nextProvider);
+
+		/*
+		 * If there is no next provider, we can assume the playlist is complete,
+		 * otherwise we notify the playback of the next provider.
+		 */
+		if (nextProvider == null) {
+			this.infoListener.onPlaylistCompletion(this);
+		} else {
+			notifyPlaybackStart(nextProvider);
+		}
 	}
 
 	// Log helpers
