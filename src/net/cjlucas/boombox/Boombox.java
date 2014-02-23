@@ -104,6 +104,18 @@ MediaPlayer.OnSeekCompleteListener
 		this.playerProviderMap.remove(player);
 	}
 
+	private void reset()
+	{
+		resetPlayers();
+		this.playlistCursor = 0;
+	}
+
+	public void release()
+	{
+		reset();
+		setInfoListener(null);
+	}
+
 	// Providers Management
 
 	private int getFollowingPlaylistIndex(int index)
