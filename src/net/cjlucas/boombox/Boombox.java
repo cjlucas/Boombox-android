@@ -502,9 +502,6 @@ MediaPlayer.OnSeekCompleteListener
 			this.proxyServer = new ProxyServer();
 			this.shouldHalt  = false;
 
-			this.provider.prepare();
-			this.proxyServer.setContentLength( this.provider.getLength() );
-
 			this.proxyServer.startServer();
 			this.proxyServer.start();
 
@@ -528,6 +525,10 @@ MediaPlayer.OnSeekCompleteListener
 
 		public void run()
 		{
+			this.provider.prepare();
+			this.proxyServer.setContentLength( this.provider.getLength() );
+
+
 			// TODO: add a timeout mechanism
 			// wait for audioProc to connect
 			while ( !this.proxyServer.hasConnection() ) {
