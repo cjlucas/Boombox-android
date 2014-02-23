@@ -94,6 +94,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	private void releaseProcessor(ProviderProcessor pp)
 	{
+		pp.halt();
 		this.processors.remove(pp);
 	}
 
@@ -101,6 +102,7 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		player.release();
 		this.players.remove(player);
+		releaseProcessor( this.playerProviderMap.get(player) );
 		this.playerProviderMap.remove(player);
 	}
 
