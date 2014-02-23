@@ -220,16 +220,11 @@ MediaPlayer.OnSeekCompleteListener
 
 	// Playback Controls
 
-	private boolean hasCurrentPlayer()
-	{
-		return this.players.size() > 0;
-	}
-
 	private MediaPlayer getCurrentPlayer()
 	{
 		MediaPlayer player = null;
 
-		if ( hasCurrentPlayer() ) {
+		if (this.players.size() > 0) {
 			player = this.players.get(0);
 		}
 
@@ -337,7 +332,7 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		MediaPlayer mp = getCurrentPlayer();
 
-		if (mp == null || mp.getDuration() == -1) {
+		if (mp == null || !mp.isPlaying() || mp.getDuration() == -1) {
 			return (int)getCurrentProvider().getDuration();
 		}
 
