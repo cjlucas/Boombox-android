@@ -373,16 +373,11 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		logi("onCompletion player: %s", player);
 
-		/*
-		* TODO: In the case of having the next media player being buffered
-		* at this point, we need to queue up another media player
-		 */
-
-		notifyPlaybackCompletion(player);
-		releasePlayer(player);
-
 		// update playlist cursor, or reset if playlist is complete
 		this.playlistCursor = Math.max( 0, getNextPlaylistCursor() );
+
+		notifyPlaybackCompletion( player, this.playerProviderMap.get(player) );
+		releasePlayer(player);
 	}
 
 	public boolean onError(MediaPlayer player, int what, int extra)
@@ -434,19 +429,16 @@ MediaPlayer.OnSeekCompleteListener
 
 	/**
 	 * Helper for notifying BoomboxInfoListener about playback status.
-	 *
-	 * This must be called before playbackCursor is updated.
 	 */
-	private void notifyPlaybackCompletion(MediaPlayer mp)
+	private void notifyPlaybackCompletion(MediaPlayer       mp,
+	                                      AudioDataProvider provider)
 	{
 		if (this.infoListener == null) {
 			return;
 		}
 
-		AudioDataProvider nextProvider = getNextProvider();
-		this.infoListener.onPlaybackCompletion(this,
-		                                       getCurrentProvider(),
-		                                       nextProvider);
+		AudioDataProvider nextProvider = getProviderAfter(provider);
+		this.infoListener.onPlaybackCompletion(this, provider, nextProvider);
 
 		/*
 		 * If there is no next provider, we can assume the playlist is complete,
