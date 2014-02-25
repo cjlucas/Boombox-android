@@ -31,7 +31,7 @@ public class ProxyServer extends Thread
 		public void forwardData(byte[] data)
 		{
 			try {
-				System.out.println( String.format("DataForwarder: writing %d bytes to outputStream", data.length) );
+				//System.out.println( String.format("DataForwarder: writing %d bytes to outputStream", data.length) );
 				this.conn.getOutputStream().write(data, 0, data.length);
 			} catch (IOException e) {
 				e.printStackTrace();

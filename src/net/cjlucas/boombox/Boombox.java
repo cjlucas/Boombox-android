@@ -1,6 +1,11 @@
 package net.cjlucas.boombox;
 
 import android.media.MediaPlayer;
+
+import android.os.Looper;
+import android.os.Handler;
+import android.os.Message;
+
 import android.util.Log;
 
 import java.io.IOException;
@@ -16,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.cjlucas.boombox.provider.AudioDataProvider;
 
-public class Boombox
+public class Boombox extends Thread
 implements
 MediaPlayer.OnBufferingUpdateListener,
 MediaPlayer.OnCompletionListener,
@@ -39,6 +44,41 @@ MediaPlayer.OnSeekCompleteListener
 
 	private boolean shuffleMode;
 	private boolean continuousMode;
+
+	private Handler handler;
+
+	enum MessageType
+	{
+		RELEASE_PLAYER(1 << 0),
+		RELEASE_PROCESSOR(1 << 1),
+		PLAY_PROVIDER(1 << 2),
+		SHUFFLE_PLAYLIST(1 << 3);
+
+		public static MessageType forValue(int value)
+		{
+			for ( MessageType type : MessageType.values() ) {
+				if (type.value == value)
+					return type;
+			}
+			return null;
+		}
+
+		public final int value;
+		MessageType(int value)
+		{
+			this.value = value;
+		}
+
+		public boolean in(MessageType ... types)
+		{
+			int bitmask = 0;
+			for (int i = 0; i < types.length; i++) {
+				bitmask = bitmask | types[i].value;
+			}
+
+			return (this.value & bitmask) > 0;
+		}
+	}
 
 	public Boombox()
 	{
@@ -68,25 +108,49 @@ MediaPlayer.OnSeekCompleteListener
 		this.infoListener = infoListener;
 	}
 
+	@Override
+	public void run()
+	{
+		Looper.prepare();
+
+		this.handler = new Handler() {
+			public void handleMessage(Message message)
+			{
+				logi("%s", message);
+				switch( MessageType.forValue(message.what) ) {
+				    case RELEASE_PLAYER:
+					    handleReleasePlayer(message);
+					    break;
+				    case RELEASE_PROCESSOR:
+					    handleReleaseProcessor(message);
+					    break;
+				    case PLAY_PROVIDER:
+					    handlePlayProvider(message);
+					    break;
+				    case SHUFFLE_PLAYLIST:
+					    // TODO
+					    break;
+				}
+			}
+		};
+
+		Looper.loop();
+	}
+
 	// Clean up
 
 	private void resetPlayers()
 	{
 		synchronized (this.players) {
 			for (MediaPlayer mp : this.players) {
-				mp.release();
+				releasePlayer(mp);
 			}
 		}
 		this.players.clear();
 
 		synchronized (this.providers) {
 			for (ProviderProcessor pp : this.processors) {
-				pp.halt();
-				try {
-					pp.join();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
+				releaseProcessor(pp);
 			}
 		}
 
@@ -96,34 +160,46 @@ MediaPlayer.OnSeekCompleteListener
 	private void releaseProcessor(ProviderProcessor pp)
 	{
 		pp.halt();
-		this.processors.remove(pp);
+
+		try {
+			logi("joining");
+			pp.join(500);
+			logi("done joining");
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		finally {
+			pp.interrupt();
+			this.processors.remove(pp);
+		}
 	}
 
-	private void releaseProcessor(AudioDataProvider provider)
-	{
-		if (provider == null) {
-			return;
-		}
-
-		ProviderProcessor ppToRemove = null;
-
-		synchronized (this.processors) {
-			for (ProviderProcessor pp : this.processors) {
-				if (pp.getProvider() == provider) {
-					ppToRemove = pp;
-					break;
-				}
-			}
-		}
-
-		releaseProcessor(ppToRemove);
-	}
+	/*
+	 *    private void releaseProcessor(AudioDataProvider provider)
+	 *    {
+	 *        if (provider == null) {
+	 *            return;
+	 *        }
+	 *
+	 *        ProviderProcessor ppToRemove = null;
+	 *
+	 *        synchronized (this.processors) {
+	 *            for (ProviderProcessor pp : this.processors) {
+	 *                if (pp.getProvider() == provider) {
+	 *                    ppToRemove = pp;
+	 *                    break;
+	 *                }
+	 *            }
+	 *        }
+	 *
+	 *        releaseProcessor(ppToRemove);
+	 *    }
+	 */
 
 	private void releasePlayer(MediaPlayer player)
 	{
 		player.release();
 		this.players.remove(player);
-		releaseProcessor( this.playerProviderMap.get(player) );
 		this.playerProviderMap.remove(player);
 	}
 
@@ -260,7 +336,7 @@ MediaPlayer.OnSeekCompleteListener
 
 		// lazy load the media player
 		if (mp == null) {
-			queueProvider( getCurrentProvider() );
+			reqPlayProvider( getCurrentProvider() );
 
 			// start is called by the onPrepared listener
 		} else {
@@ -301,20 +377,16 @@ MediaPlayer.OnSeekCompleteListener
 	public void playNext()
 	{
 		if ( hasNext() ) {
-			resetPlayers();
-
 			this.playlistCursor = getNextPlaylistCursor();
-			play();
+			reqPlayProvider( this.playlist.get(this.playlistCursor) );
 		}
 	}
 
 	public void playPrevious()
 	{
 		if ( hasPrevious() ) {
-			resetPlayers();
-
 			this.playlistCursor = getPreviousPlaylistCursor();
-			play();
+			reqPlayProvider( this.playlist.get(this.playlistCursor) );
 		}
 	}
 
@@ -489,6 +561,79 @@ MediaPlayer.OnSeekCompleteListener
 		logi("onSeekComplete player: %s", player);
 	}
 
+	// Request senders
+
+	private Message obtainMessage(MessageType type, Object obj)
+	{
+		return this.handler.obtainMessage(type.value, obj);
+	}
+
+	private boolean hasMessages(MessageType type)
+	{
+		return this.handler.hasMessages(type.value);
+	}
+
+	private void reqReleasePlayer(MediaPlayer player)
+	{
+		Message msg = obtainMessage(MessageType.RELEASE_PLAYER, player);
+		this.handler.sendMessage(msg);
+	}
+
+	private void reqReleaseAllPlayers()
+	{
+		synchronized (this.players) {
+			for (MediaPlayer player : this.players) {
+				reqReleasePlayer(player);
+			}
+		}
+	}
+
+	private void reqReleaseProcessor(ProviderProcessor pp)
+	{
+		Message msg = obtainMessage(MessageType.RELEASE_PROCESSOR, pp);
+		this.handler.sendMessage(msg);
+	}
+
+	private void reqReleaseAllProcessors()
+	{
+		synchronized (this.processors) {
+			for (ProviderProcessor pp : this.processors) {
+				reqReleaseProcessor(pp);
+			}
+		}
+	}
+
+	private void reqPlayProvider(AudioDataProvider provider)
+	{
+		reqReleaseAllPlayers();
+		reqReleaseAllProcessors();
+
+		Message msg = obtainMessage(MessageType.PLAY_PROVIDER, provider);
+		this.handler.sendMessage(msg);
+	}
+
+	// Message handlers
+
+	private void handleReleasePlayer(Message msg)
+	{
+		releasePlayer( (MediaPlayer)msg.obj );
+	}
+
+	private void handleReleaseProcessor(Message msg)
+	{
+		releaseProcessor( (ProviderProcessor)msg.obj );
+	}
+
+	private void handlePlayProvider(Message msg)
+	{
+		// Don't bother playing if we have another play request coming
+		if ( hasMessages(MessageType.PLAY_PROVIDER) ) {
+			return;
+		}
+
+		queueProvider( (AudioDataProvider)msg.obj );
+	}
+
 	// BoomboxInfoListener helpers
 
 	private void notifyPlaybackStart(AudioDataProvider provider)
@@ -609,7 +754,10 @@ MediaPlayer.OnSeekCompleteListener
 			// TODO: add a timeout mechanism
 			// wait for audioProc to connect
 			while ( !this.proxyServer.hasConnection() ) {
-				try { Thread.sleep(50); } catch (Exception e) {
+				try {
+					Thread.sleep(50);
+				} catch (InterruptedException e) {
+					logi("got interrupted here yo");
 				}
 			}
 
