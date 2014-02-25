@@ -37,6 +37,7 @@ MediaPlayer.OnSeekCompleteListener
 	private List<MediaPlayer> players;
 	private List<ProviderProcessor> processors;
 	private Map<MediaPlayer, AudioDataProvider> playerProviderMap;
+	private Map<MediaPlayer, PlayerState> playerStateMap;
 
 	private int playlistCursor;
 
@@ -46,6 +47,16 @@ MediaPlayer.OnSeekCompleteListener
 	private boolean continuousMode;
 
 	private Handler handler;
+
+	enum PlayerState
+	{
+		IDLE, INITIALIZED, PREPARING, PREPARED, STARTED, PAUSED, STOPPED;
+
+		public boolean isPrepared()
+		{
+			return this == PREPARED || this == STARTED || this == PAUSED;
+		}
+	}
 
 	enum MessageType
 	{
@@ -215,6 +226,11 @@ MediaPlayer.OnSeekCompleteListener
 		setInfoListener(null);
 	}
 
+	private void setPlayerState(MediaPlayer player, PlayerState state)
+	{
+		this.playerStateMap.put(player, state);
+	}
+
 	// Providers Management
 
 	private int getFollowingPlaylistIndex(int index)
@@ -303,9 +319,12 @@ MediaPlayer.OnSeekCompleteListener
 		mp.setOnInfoListener(this);
 		mp.setOnPreparedListener(this);
 		mp.setOnSeekCompleteListener(this);
+		setPlayerState(mp, PlayerState.IDLE);
 
 		try {
 			mp.setDataSource( pp.getProxyURL().toString() );
+			setPlayerState(mp, PlayerState.INITIALIZED);
+			setPlayerState(mp, PlayerState.PREPARING);
 			mp.prepareAsync();
 		} catch (IOException e) {
 			loge("queueProvider failed", e);
@@ -341,6 +360,7 @@ MediaPlayer.OnSeekCompleteListener
 			// start is called by the onPrepared listener
 		} else {
 			mp.start();
+			setPlayerState(mp, PlayerState.STARTED);
 		}
 	}
 
@@ -350,6 +370,7 @@ MediaPlayer.OnSeekCompleteListener
 
 		if (mp != null) {
 			mp.pause();
+			setPlayerState(mp, PlayerState.PAUSED);
 		}
 	}
 
@@ -474,16 +495,21 @@ MediaPlayer.OnSeekCompleteListener
 
 	public int getCurrentPosition()
 	{
-		MediaPlayer mp = getCurrentPlayer();
+		MediaPlayer mp    = getCurrentPlayer();
+		PlayerState state = this.playerStateMap.get(mp);
 
-		return mp == null ? 0 : mp.getCurrentPosition();
+		return mp == null || !state.isPrepared()
+		       ? 0 : mp.getCurrentPosition();
 	}
 
 	public int getDuration()
 	{
-		MediaPlayer mp = getCurrentPlayer();
+		MediaPlayer mp    = getCurrentPlayer();
+		PlayerState state = this.playerStateMap.get(mp);
 
-		if (mp == null || !mp.isPlaying() || mp.getDuration() == -1) {
+		// Fall back to AudioDataProvider.getDuration() if
+		// we can't get the duration from MediaPlayer
+		if (mp == null || !state.isPrepared() || mp.getDuration() == -1) {
 			return (int)getCurrentProvider().getDuration();
 		}
 
@@ -522,7 +548,11 @@ MediaPlayer.OnSeekCompleteListener
 		this.playlistCursor = Math.max( 0, getNextPlaylistCursor() );
 
 		notifyPlaybackCompletion( player, this.playerProviderMap.get(player) );
+		setPlayerState(player, PlayerState.STOPPED);
 		releasePlayer(player);
+
+		// TODO: figure out when to set started state for player
+		// that was set as the next player for the player that just completed
 	}
 
 	public boolean onError(MediaPlayer player, int what, int extra)
@@ -542,6 +572,7 @@ MediaPlayer.OnSeekCompleteListener
 	public void onPrepared(MediaPlayer player)
 	{
 		logi("onPrepared player: %s", player);
+		setPlayerState(player, PlayerState.PREPARED);
 
 		/*
 		 * If given player is at the head of the list, immediately start
@@ -550,6 +581,7 @@ MediaPlayer.OnSeekCompleteListener
 		int index = this.players.indexOf(player);
 		if (index == 0) {
 			player.start();
+			setPlayerState(player, PlayerState.STARTED);
 			notifyPlaybackStart( this.playerProviderMap.get(player) );
 		} else {
 			this.players.get(index - 1).setNextMediaPlayer(player);
