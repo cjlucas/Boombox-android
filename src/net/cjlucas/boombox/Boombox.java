@@ -364,6 +364,33 @@ MediaPlayer.OnSeekCompleteListener
 		}
 	}
 
+	public void play(AudioDataProvider provider)
+	{
+		this.playlistCursor = this.playlist.indexOf(provider);
+		reqPlayProvider(provider);
+	}
+
+	public void play(Object id)
+	{
+		synchronized (this.playlist) {
+			int index = 0;
+
+			for (AudioDataProvider provider : this.playlist) {
+				if ( provider.getId().equals(id) ) {
+					break;
+				}
+				index++;
+			}
+
+			// TODO: throw exception if provider was not found
+
+			if ( index < this.playlist.size() ) {
+				this.playlistCursor = index;
+				reqPlayProvider( this.playlist.get(index) );
+			}
+		}
+	}
+
 	public void pause()
 	{
 		MediaPlayer mp = getCurrentPlayer();
