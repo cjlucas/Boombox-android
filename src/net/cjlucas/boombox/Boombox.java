@@ -217,16 +217,14 @@ MediaPlayer.OnSeekCompleteListener
 
 	private void releasePlayer(MediaPlayer player)
 	{
-		setPlayerState(player, PlayerState.STOPPING);
-		player.stop();
-		setPlayerState(player, PlayerState.STOPPED);
+		synchronized (player) {
+			setPlayerState(player, PlayerState.RELEASING);
+			player.release();
+			setPlayerState(player, PlayerState.RELEASED);
 
-		setPlayerState(player, PlayerState.RELEASING);
-		player.release();
-		setPlayerState(player, PlayerState.RELEASED);
-
-		this.players.remove(player);
-		this.playerProviderMap.remove(player);
+			this.players.remove(player);
+			this.playerProviderMap.remove(player);
+		}
 	}
 
 	private void reset()
@@ -411,8 +409,10 @@ MediaPlayer.OnSeekCompleteListener
 		MediaPlayer mp = getCurrentPlayer();
 
 		if (mp != null) {
-			mp.pause();
-			setPlayerState(mp, PlayerState.PAUSED);
+			synchronized (mp) {
+				mp.pause();
+				setPlayerState(mp, PlayerState.PAUSED);
+			}
 		}
 	}
 
@@ -537,28 +537,35 @@ MediaPlayer.OnSeekCompleteListener
 
 	public int getCurrentPosition()
 	{
-		MediaPlayer mp    = getCurrentPlayer();
-		PlayerState state = this.playerStateMap.get(mp);
+		MediaPlayer mp = getCurrentPlayer();
 
 		if (mp == null) {
 			return 0;
 		}
 
-		return state.isPlaying() ? mp.getCurrentPosition() : 0;
+		synchronized (mp) {
+			PlayerState state = this.playerStateMap.get(mp);
+			return state.isPlaying() ? mp.getCurrentPosition() : 0;
+		}
 	}
 
 	public int getDuration()
 	{
-		MediaPlayer mp    = getCurrentPlayer();
-		PlayerState state = this.playerStateMap.get(mp);
-
+		MediaPlayer mp = getCurrentPlayer();
 		// Fall back to AudioDataProvider.getDuration() if
 		// we can't get the duration from MediaPlayer
-		if (mp == null || !state.isPrepared() || mp.getDuration() == -1) {
-			return (int)getCurrentProvider().getDuration();
+		int providerDuration = (int)getCurrentProvider().getDuration();
+
+		if (mp == null) {
+			return providerDuration;
 		}
 
-		return mp.getDuration();
+		synchronized (mp) {
+			PlayerState state = this.playerStateMap.get(mp);
+
+			return (!state.isPrepared() || mp.getDuration() == -1)
+			       ? providerDuration : mp.getDuration();
+		}
 	}
 
 	// MediaPlayer Callbacks
