@@ -50,7 +50,8 @@ MediaPlayer.OnSeekCompleteListener
 
 	enum PlayerState
 	{
-		IDLE, INITIALIZED, PREPARING, PREPARED, STARTED, PAUSED, STOPPED;
+		IDLE, INITIALIZED, PREPARING, PREPARED, STARTED, PAUSED, STOPPING,
+		STOPPED, RELEASING, RELEASED;
 
 		public boolean isPrepared()
 		{
@@ -216,8 +217,14 @@ MediaPlayer.OnSeekCompleteListener
 
 	private void releasePlayer(MediaPlayer player)
 	{
+		setPlayerState(player, PlayerState.STOPPING);
+		player.stop();
 		setPlayerState(player, PlayerState.STOPPED);
+
+		setPlayerState(player, PlayerState.RELEASING);
 		player.release();
+		setPlayerState(player, PlayerState.RELEASED);
+
 		this.players.remove(player);
 		this.playerProviderMap.remove(player);
 	}
