@@ -56,6 +56,11 @@ MediaPlayer.OnSeekCompleteListener
 		{
 			return this == PREPARED || this == STARTED || this == PAUSED;
 		}
+
+		public boolean isPlaying()
+		{
+			return this == STARTED || this == PAUSED;
+		}
 	}
 
 	enum MessageType
@@ -103,6 +108,8 @@ MediaPlayer.OnSeekCompleteListener
 		        new ArrayList<ProviderProcessor>() );
 		this.playerProviderMap =
 		        new ConcurrentHashMap<MediaPlayer, AudioDataProvider>();
+		this.playerStateMap =
+		        new ConcurrentHashMap<MediaPlayer, PlayerState>();
 		this.playlistCursor = 0;
 		this.shuffleMode    = false;
 		this.continuousMode = false;
@@ -209,6 +216,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	private void releasePlayer(MediaPlayer player)
 	{
+		setPlayerState(player, PlayerState.STOPPED);
 		player.release();
 		this.players.remove(player);
 		this.playerProviderMap.remove(player);
@@ -525,8 +533,11 @@ MediaPlayer.OnSeekCompleteListener
 		MediaPlayer mp    = getCurrentPlayer();
 		PlayerState state = this.playerStateMap.get(mp);
 
-		return mp == null || !state.isPrepared()
-		       ? 0 : mp.getCurrentPosition();
+		if (mp == null) {
+			return 0;
+		}
+
+		return state.isPlaying() ? mp.getCurrentPosition() : 0;
 	}
 
 	public int getDuration()
