@@ -44,9 +44,14 @@ MediaPlayer.OnSeekCompleteListener
 	private BoomboxInfoListener infoListener;
 
 	private boolean shuffleMode;
-	private boolean continuousMode;
+	private ContinuousMode continuousMode;
 
 	private Handler handler;
+
+	enum ContinuousMode
+	{
+		NONE, SINGLE, PLAYLIST;
+	}
 
 	enum PlayerState
 	{
@@ -113,7 +118,7 @@ MediaPlayer.OnSeekCompleteListener
 		        new ConcurrentHashMap<MediaPlayer, PlayerState>();
 		this.playlistCursor = 0;
 		this.shuffleMode    = false;
-		this.continuousMode = false;
+		this.continuousMode = continuousMode.NONE;
 	}
 
 	public Boombox(BoomboxInfoListener infoListener)
@@ -250,7 +255,8 @@ MediaPlayer.OnSeekCompleteListener
 	{
 		int newIndex = index + 1;
 
-		if ( !this.continuousMode && newIndex >= this.playlist.size() ) {
+		if ( this.continuousMode != ContinuousMode.PLAYLIST
+		     && newIndex >= this.playlist.size() ) {
 			return -1;
 		}
 
@@ -267,7 +273,8 @@ MediaPlayer.OnSeekCompleteListener
 		int newIndex = index - 1;
 
 		if (newIndex < 0) {
-			return this.continuousMode ? this.playlist.size() - 1 : -1;
+			return this.continuousMode == ContinuousMode.PLAYLIST
+			       ? this.playlist.size() - 1 : -1;
 		} else {
 			return newIndex;
 		}
@@ -520,17 +527,18 @@ MediaPlayer.OnSeekCompleteListener
 		}
 	}
 
-	public void setContinuousMode(boolean continuous)
-	{
-		this.continuousMode = continuous;
-	}
-
 	public boolean isShuffleModeEnabled()
 	{
 		return this.shuffleMode;
 	}
 
-	public boolean isContinuousModeEnabled()
+	public void setContinuousMode(ContinuousMode continuousMode)
+	{
+		// TODO: handle transitions between old and new modes appropriately
+		this.continuousMode = continuousMode;
+	}
+
+	public ContinuousMode getContinuousMode()
 	{
 		return this.continuousMode;
 	}
