@@ -48,7 +48,7 @@ MediaPlayer.OnSeekCompleteListener
 
 	private Handler handler;
 
-	enum ContinuousMode
+	public enum ContinuousMode
 	{
 		NONE, SINGLE, PLAYLIST;
 	}
