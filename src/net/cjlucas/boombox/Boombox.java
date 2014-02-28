@@ -338,7 +338,11 @@ public class Boombox extends Thread
 
         // if data provider could not be prepared, skip to the next track
         if (!pp.prepare()) {
-            playNext();
+            if (hasNext()) {
+                playNext();
+            } else {
+                notifyPlaylistCompletion();
+            }
             return;
         }
         pp.start();
@@ -775,6 +779,15 @@ public class Boombox extends Thread
         this.infoListener.onPlaybackStart( this, provider);
     }
 
+    private void notifyPlaylistCompletion()
+    {
+        if (this.infoListener == null) {
+            return;
+        }
+
+        this.infoListener.onPlaylistCompletion(this);
+    }
+
     /**
      * Helper for notifying BoomboxInfoListener about playback status.
      */
@@ -793,7 +806,7 @@ public class Boombox extends Thread
          * otherwise we notify the playback of the next provider.
          */
         if (nextProvider == null) {
-            this.infoListener.onPlaylistCompletion(this);
+            notifyPlaylistCompletion();
         } else {
             notifyPlaybackStart(nextProvider);
         }
