@@ -532,7 +532,7 @@ public class Boombox extends Thread
         boolean oldMode = isShuffleModeEnabled();
 
         // Don't do anything if mode is the same
-        if (oldMode == this.shuffleMode) return;
+        if (oldMode == shuffle) return;
 
         this.shuffleMode = shuffle;
 
