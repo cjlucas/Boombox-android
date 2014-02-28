@@ -73,7 +73,8 @@ public class Boombox extends Thread
         RELEASE_PLAYER(1 << 0),
         RELEASE_PROCESSOR(1 << 1),
         PLAY_PROVIDER(1 << 2),
-        SHUFFLE_PLAYLIST(1 << 3);
+        SHUFFLE_PLAYLIST(1 << 3),
+        RESET_PLAYLIST(1 << 4);
 
         public static MessageType forValue(int value)
         {
@@ -151,8 +152,13 @@ public class Boombox extends Thread
                         handlePlayProvider(message);
                         break;
                     case SHUFFLE_PLAYLIST:
-                        // TODO
+                        handleShufflePlaylist(message);
                         break;
+                    case RESET_PLAYLIST:
+                        handleResetPlaylist(message);
+                        break;
+                    default:
+                        throw new RuntimeException("Unhandled message: " + message);
                 }
             }
         };
@@ -500,29 +506,34 @@ public class Boombox extends Thread
 
     private void resetPlaylist()
     {
-        AudioDataProvider currentProvider = getCurrentProvider();
-        this.playlist.clear();
-        logi( "provider size: %d", this.providers.size() );
+        synchronized (this.playlist) {
+            AudioDataProvider currentProvider = getCurrentProvider();
+            this.playlist.clear();
+            logi( "provider size: %d", this.providers.size() );
 
-        for (AudioDataProvider provider : this.providers) {
-            this.playlist.add(provider);
+            for (AudioDataProvider provider : this.providers) {
+                this.playlist.add(provider);
+            }
+
+            logi( "playlist size %d", this.playlist.size() );
+
+            this.playlistCursor = this.playlist.indexOf(currentProvider);
         }
-
-        logi( "playlist size %d", this.playlist.size() );
-
-        this.playlistCursor = this.playlist.indexOf(currentProvider);
     }
 
     public void setShuffleMode(boolean shuffle)
     {
         boolean oldMode = isShuffleModeEnabled();
+
+        // Don't do anything if mode is the same
+        if (oldMode == this.shuffleMode) return;
+
         this.shuffleMode = shuffle;
 
-        // prevent reshuffling if already shuffled
-        if ( oldMode == false && isShuffleModeEnabled() ) {
-            shufflePlaylist();
-        } else if ( oldMode == true && !isShuffleModeEnabled() ) {
-            resetPlaylist();
+        if (this.shuffleMode) {
+            reqShufflePlaylist();
+        } else {
+            reqResetPlaylist();
         }
     }
 
@@ -703,6 +714,18 @@ public class Boombox extends Thread
         this.handler.sendMessage(msg);
     }
 
+    private void reqShufflePlaylist()
+    {
+        Message msg = obtainMessage(MessageType.SHUFFLE_PLAYLIST, null);
+        this.handler.sendMessage(msg);
+    }
+
+    private void reqResetPlaylist()
+    {
+        Message msg = obtainMessage(MessageType.RESET_PLAYLIST, null);
+        this.handler.sendMessage(msg);
+    }
+
     // Message handlers
 
     private void handleReleasePlayer(Message msg)
@@ -723,6 +746,16 @@ public class Boombox extends Thread
         }
 
         queueProvider( (AudioDataProvider)msg.obj );
+    }
+
+    private void handleShufflePlaylist(Message msg)
+    {
+        shufflePlaylist();
+    }
+
+    private void handleResetPlaylist(Message msg)
+    {
+        resetPlaylist();
     }
 
     // BoomboxInfoListener helpers
