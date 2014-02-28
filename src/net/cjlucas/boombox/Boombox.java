@@ -118,7 +118,7 @@ public class Boombox extends Thread
                 new ConcurrentHashMap<MediaPlayer, PlayerState>();
         this.playlistCursor = 0;
         this.shuffleMode    = false;
-        this.continuousMode = continuousMode.NONE;
+        this.continuousMode = ContinuousMode.NONE;
     }
 
     public Boombox(BoomboxInfoListener infoListener)
@@ -335,6 +335,12 @@ public class Boombox extends Thread
     private void queueProvider(AudioDataProvider provider)
     {
         ProviderProcessor pp = new ProviderProcessor(provider);
+
+        // if data provider could not be prepared, skip to the next track
+        if (!pp.prepare()) {
+            playNext();
+            return;
+        }
         pp.start();
 
         MediaPlayer mp = new MediaPlayer();
@@ -847,11 +853,28 @@ public class Boombox extends Thread
             this.provider    = provider;
             this.proxyServer = new ProxyServer();
             this.shouldHalt  = false;
+        }
 
-            this.proxyServer.startServer();
-            this.proxyServer.start();
+        public boolean prepare()
+        {
+            if (this.provider.prepare()) {
+                this.proxyServer.startServer();
+                this.proxyServer.setContentLength( this.provider.getLength() );
+                this.proxyServer.start();
 
-            logi( "Starting proxy server @ " + getProxyURL() );
+                logi( "Starting proxy server @ " + getProxyURL() );
+                return true;
+            }
+
+            tearDown();
+            return false;
+        }
+
+        private void tearDown()
+        {
+            this.proxyServer.stopServer();
+            this.provider.release();
+            releaseProcessor(this);
         }
 
         public URL getProxyURL()
@@ -871,10 +894,6 @@ public class Boombox extends Thread
 
         public void run()
         {
-            this.provider.prepare();
-            this.proxyServer.setContentLength( this.provider.getLength() );
-
-
             // TODO: add a timeout mechanism
             // wait for audioProc to connect
             while ( !this.proxyServer.hasConnection() ) {
@@ -893,15 +912,15 @@ public class Boombox extends Thread
                 if (size > 0) {
                     this.proxyServer.sendData( shrinkBuffer(buffer, size) );
                 } else if (size == AudioDataProvider.STATUS_EOF_REACHED) {
-                    logi("ProviderProcessor: EOF reached");
-                    this.proxyServer.stopServer();
+                    logi("ProviderProcessor: EOF_REACHED");
+                    halt();
+                } else if (size == AudioDataProvider.STATUS_ERROR_OCCURED) {
+                    loge("ProviderProcessor: ERROR_OCCURED");
                     halt();
                 }
             }
 
-            this.proxyServer.stopServer();
-            this.provider.release();
-            releaseProcessor(this);
+            tearDown();
         }
 
         private byte[] shrinkBuffer(byte[] buffer, int size)
