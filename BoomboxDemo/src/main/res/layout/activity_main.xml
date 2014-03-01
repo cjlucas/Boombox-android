@@ -96,7 +96,7 @@
         android:layout_height="wrap_content"
         android:layout_centerHorizontal="true"
         android:layout_below="@+id/textView1"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal" >
 
         <RadioButton
@@ -118,5 +118,16 @@
             android:layout_height="wrap_content"
             android:text="Playlist" />
     </RadioGroup>
+
+    <SeekBar
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/seekBar"
+        android:layout_above="@+id/prev_btn"
+        android:layout_alignRight="@+id/next_btn"
+        android:layout_alignEnd="@+id/next_btn"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginBottom="10dp" />
 
 </RelativeLayout>

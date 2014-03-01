@@ -8,6 +8,7 @@ import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -26,9 +27,10 @@ import net.cjlucas.boombox.provider.*;
 public class MainActivity extends Activity
         implements
         BoomboxInfoListener,
-        RadioGroup.OnCheckedChangeListener {
+        RadioGroup.OnCheckedChangeListener,
+        SeekBar.OnSeekBarChangeListener {
     private static final String TAG = "MainActivity";
-    private static final int UPDATE_UI_INTERVAL = 50;
+    private static final int UPDATE_UI_INTERVAL = 100;
 
     private Boombox mBoombox;
     private Timer mUpdateUiTimer;
@@ -41,6 +43,10 @@ public class MainActivity extends Activity
     private TextView mProgressTextView;
     private TextView mDurationTextView;
     private RadioGroup mContinuousRadioGroup;
+    private SeekBar mSeekBar;
+    private boolean mIsSeeking;
+    private int mSeekProgress;
+
 
     private TimerTask mUpdateUiTask = new TimerTask() {
         public void run() {
@@ -69,9 +75,13 @@ public class MainActivity extends Activity
         mUpNextTextView = (TextView) findViewById(R.id.up_next);
         mProgressTextView = (TextView) findViewById(R.id.progress);
         mDurationTextView = (TextView) findViewById(R.id.duration);
-        mContinuousRadioGroup = (RadioGroup) findViewById(R.id.continuous_group);
 
+        mContinuousRadioGroup = (RadioGroup) findViewById(R.id.continuous_group);
         mContinuousRadioGroup.setOnCheckedChangeListener(this);
+
+        mSeekBar = (SeekBar) findViewById(R.id.seekBar);
+        mSeekBar.setOnSeekBarChangeListener(this);
+        mIsSeeking = false;
 
         mUpdateUiTimer = new Timer();
         mUpdateUiTimer.schedule(mUpdateUiTask, 0, UPDATE_UI_INTERVAL);
@@ -133,6 +143,9 @@ public class MainActivity extends Activity
                 mPrevButton.setEnabled(getBoombox().hasPrevious());
                 mNextButton.setEnabled(getBoombox().hasNext());
 
+                double currentPosition = getBoombox().getCurrentPosition() / 1000.0;
+                double duration = getBoombox().getDuration() / 1000.0;
+
                 AudioDataProvider currentProvider = getBoombox().getCurrentProvider();
 
                 String currentlyPlaying = String.format(Locale.getDefault(), "%s: %s",
@@ -149,16 +162,11 @@ public class MainActivity extends Activity
 
                 mUpNextTextView.setText(upNext);
 
-                String progress = String.format(Locale.getDefault(), "%s: %fs",
-                        getResources().getString(R.string.progress),
-                        getBoombox().getCurrentPosition() / 1000.0);
-                mProgressTextView.setText(progress);
+                mProgressTextView.setText(sformat("%s: %fs",
+                        getResources().getString(R.string.progress), currentPosition));
 
-                String duration = String.format(Locale.getDefault(), "%s: %fs",
-                        getResources().getString(R.string.duration),
-                        getBoombox().getDuration() / 1000.0);
-
-                mDurationTextView.setText(duration);
+                mDurationTextView.setText(sformat("%s: %fs",
+                        getResources().getString(R.string.duration), duration));
 
                 switch (getBoombox().getContinuousMode()) {
                     case NONE:
@@ -170,6 +178,11 @@ public class MainActivity extends Activity
                     case PLAYLIST:
                         mContinuousRadioGroup.check(R.id.continuous_playlist);
                         break;
+                }
+
+                if (!mIsSeeking) {
+                    mSeekBar.setProgress(duration > 0
+                            ? (int)((currentPosition / duration) * 100) : 0);
                 }
             }
         });
@@ -192,6 +205,10 @@ public class MainActivity extends Activity
 
     public void shuffleModeSwitchChanged(View view) {
         mBoombox.setShuffleMode(((Switch) view).isChecked());
+    }
+
+    private String sformat(String format, Object...args) {
+        return String.format(Locale.getDefault(), format, args);
     }
 
     // BoomboxInfoListener Methods
@@ -247,5 +264,22 @@ public class MainActivity extends Activity
 
         mBoombox.setContinuousMode(mode);
         updateUi();
+    }
+
+    // SeekBar.OnSeekBarChangeListener methods
+
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+//        Log.v(TAG, sformat("onProgressChanged: progress: %d fromUser: %s",
+//                progress, fromUser ? "YES" : "NO"));
+
+        if (fromUser) mSeekProgress = progress;
+    }
+
+    public void onStartTrackingTouch(SeekBar seekBar) {
+        mIsSeeking = true;
+    }
+
+    public void onStopTrackingTouch(SeekBar seekBar) {
+        mIsSeeking = false;
     }
 }
