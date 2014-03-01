@@ -1,0 +1,164 @@
+ECLIPSE ANDROID PROJECT IMPORT SUMMARY
+======================================
+
+Manifest Merging:
+-----------------
+Your project uses libraries that provide manifests, and your Eclipse
+project did not explicitly turn on manifest merging. In Android Gradle
+projects, manifests are always merged (meaning that contents from your
+libraries' manifests will be merged into the app manifest. If you had
+manually copied contents from library manifests into your app manifest
+you may need to remove these for the app to build correctly.
+
+Ignored Files:
+--------------
+The following files were *not* copied into the new Gradle project; you
+should evaluate whether these are still needed in your project and if
+so manually move them:
+
+From Boombox:
+* .gitignore
+* BoomboxDemo/
+* BoomboxDemo/.classpath
+* BoomboxDemo/.project
+* BoomboxDemo/.settings/
+* BoomboxDemo/.settings/org.eclipse.jdt.core.prefs
+* BoomboxDemo/AndroidManifest.xml
+* BoomboxDemo/bin/
+* BoomboxDemo/bin/AndroidManifest.xml
+* BoomboxDemo/bin/BoomboxDemo.apk
+* BoomboxDemo/bin/R.txt
+* BoomboxDemo/bin/classes.dex
+* BoomboxDemo/bin/classes/
+* BoomboxDemo/bin/classes/net/
+* BoomboxDemo/bin/classes/net/cjlucas/
+* BoomboxDemo/bin/classes/net/cjlucas/boombox/
+* BoomboxDemo/bin/classes/net/cjlucas/boombox/R$drawable.class
+* BoomboxDemo/bin/classes/net/cjlucas/boombox/R$string.class
+* BoomboxDemo/bin/classes/net/cjlucas/boombox/R$style.class
+* BoomboxDemo/bin/classes/net/cjlucas/boombox/R.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/BuildConfig.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/MainActivity$1.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/MainActivity$2.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/MainActivity.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/ProviderListFragment$OnProviderSelectedListener.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/ProviderListFragment.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$attr.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$dimen.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$drawable.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$id.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$layout.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$menu.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$raw.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$string.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R$style.class
+* BoomboxDemo/bin/classes/net/cjlucas/boomboxdemo/R.class
+* BoomboxDemo/bin/dexedLibs/
+* BoomboxDemo/bin/dexedLibs/android-support-v4-ad988995e36d521a3bb3a9b73258c118.jar
+* BoomboxDemo/bin/dexedLibs/android-support-v4-d87ab70e59fa8e5923372877913b1ca9.jar
+* BoomboxDemo/bin/dexedLibs/boombox-555eaa4e3736c3289f270bd9c54bfe17.jar
+* BoomboxDemo/bin/jarlist.cache
+* BoomboxDemo/bin/res/
+* BoomboxDemo/bin/res/crunch/
+* BoomboxDemo/bin/res/crunch/drawable-hdpi/
+* BoomboxDemo/bin/res/crunch/drawable-hdpi/ic_launcher.png
+* BoomboxDemo/bin/res/crunch/drawable-mdpi/
+* BoomboxDemo/bin/res/crunch/drawable-mdpi/ic_launcher.png
+* BoomboxDemo/bin/res/crunch/drawable-xhdpi/
+* BoomboxDemo/bin/res/crunch/drawable-xhdpi/ic_launcher.png
+* BoomboxDemo/bin/res/crunch/drawable-xxhdpi/
+* BoomboxDemo/bin/res/crunch/drawable-xxhdpi/ic_launcher.png
+* BoomboxDemo/bin/resources.ap_
+* BoomboxDemo/gen/
+* BoomboxDemo/gen/net/
+* BoomboxDemo/gen/net/cjlucas/
+* BoomboxDemo/gen/net/cjlucas/boombox/
+* BoomboxDemo/gen/net/cjlucas/boombox/R.java
+* BoomboxDemo/gen/net/cjlucas/boomboxdemo/
+* BoomboxDemo/gen/net/cjlucas/boomboxdemo/BuildConfig.java
+* BoomboxDemo/gen/net/cjlucas/boomboxdemo/R.java
+* BoomboxDemo/ic_launcher-web.png
+* BoomboxDemo/libs/
+* BoomboxDemo/libs/android-support-v4.jar
+* BoomboxDemo/proguard-project.txt
+* BoomboxDemo/project.properties
+* BoomboxDemo/res/
+* BoomboxDemo/res/drawable-hdpi/
+* BoomboxDemo/res/drawable-hdpi/ic_launcher.png
+* BoomboxDemo/res/drawable-mdpi/
+* BoomboxDemo/res/drawable-mdpi/ic_launcher.png
+* BoomboxDemo/res/drawable-xhdpi/
+* BoomboxDemo/res/drawable-xhdpi/ic_launcher.png
+* BoomboxDemo/res/drawable-xxhdpi/
+* BoomboxDemo/res/drawable-xxhdpi/ic_launcher.png
+* BoomboxDemo/res/layout/
+* BoomboxDemo/res/layout/activity_main.xml
+* BoomboxDemo/res/layout/provider_list_fragment.xml
+* BoomboxDemo/res/menu/
+* BoomboxDemo/res/menu/main.xml
+* BoomboxDemo/res/raw/
+* BoomboxDemo/res/raw/sources.txt
+* BoomboxDemo/res/values-sw600dp/
+* BoomboxDemo/res/values-sw600dp/dimens.xml
+* BoomboxDemo/res/values-sw720dp-land/
+* BoomboxDemo/res/values-sw720dp-land/dimens.xml
+* BoomboxDemo/res/values-v11/
+* BoomboxDemo/res/values-v11/styles.xml
+* BoomboxDemo/res/values-v14/
+* BoomboxDemo/res/values-v14/styles.xml
+* BoomboxDemo/res/values/
+* BoomboxDemo/res/values/dimens.xml
+* BoomboxDemo/res/values/strings.xml
+* BoomboxDemo/res/values/styles.xml
+* BoomboxDemo/src/
+* BoomboxDemo/src/net/
+* BoomboxDemo/src/net/cjlucas/
+* BoomboxDemo/src/net/cjlucas/boomboxdemo/
+* BoomboxDemo/src/net/cjlucas/boomboxdemo/MainActivity.java
+* BoomboxDemo/src/net/cjlucas/boomboxdemo/ProviderListFragment.java
+* proguard-project.txt
+From BoomboxDemo:
+* ic_launcher-web.png
+* proguard-project.txt
+
+Replaced Jars with Dependencies:
+--------------------------------
+The importer recognized the following .jar files as third party
+libraries and replaced them with Gradle dependencies instead. This has
+the advantage that more explicit version information is known, and the
+libraries can be updated automatically. However, it is possible that
+the .jar file in your project was of an older version than the
+dependency we picked, which could render the project not compileable.
+You can disable the jar replacement in the import wizard and try again:
+
+android-support-v4.jar => com.android.support:support-v4:+
+
+Moved Files:
+------------
+Android Gradle projects use a different directory structure than ADT
+Eclipse projects. Here's how the projects were restructured:
+
+In Boombox:
+* AndroidManifest.xml => boombox/src/main/AndroidManifest.xml
+* res/ => boombox/src/main/res/
+* src/ => boombox/src/main/java/
+In BoomboxDemo:
+* AndroidManifest.xml => boomboxDemo/src/main/AndroidManifest.xml
+* res/ => boomboxDemo/src/main/res/
+* src/ => boomboxDemo/src/main/java/
+
+Next Steps:
+-----------
+You can now build the project. The Gradle project needs network
+connectivity to download dependencies.
+
+Bugs:
+-----
+If for some reason your project does not build, and you determine that
+it is due to a bug or limitation of the Eclipse to Gradle importer,
+please file a bug at http://b.android.com with category
+Component-Tools.
+
+(This import summary is for your information only, and can be deleted
+after import once you are satisfied with the results.)

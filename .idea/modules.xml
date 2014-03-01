@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/BoomboxDemo.iml" filepath="$PROJECT_DIR$/BoomboxDemo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/boombox/boombox.iml" filepath="$PROJECT_DIR$/boombox/boombox.iml" />
+      <module fileurl="file://$PROJECT_DIR$/boomboxDemo/boomboxDemo.iml" filepath="$PROJECT_DIR$/boomboxDemo/boomboxDemo.iml" />
+    </modules>
+  </component>
+</project>
+
