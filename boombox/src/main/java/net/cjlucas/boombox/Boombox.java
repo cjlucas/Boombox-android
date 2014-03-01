@@ -47,7 +47,7 @@ public class Boombox extends Thread
     private Handler handler;
 
     public enum ContinuousMode {
-        NONE, SINGLE, PLAYLIST;
+        NONE, SINGLE, PLAYLIST
     }
 
     enum PlayerState {
@@ -64,7 +64,7 @@ public class Boombox extends Thread
     }
 
     enum MessageType {
-        RELEASE_PLAYER(1 << 0),
+        RELEASE_PLAYER(1),
         RELEASE_PROCESSOR(1 << 1),
         PLAY_PROVIDER(1 << 2),
         SHUFFLE_PLAYLIST(1 << 3),
@@ -317,6 +317,8 @@ public class Boombox extends Thread
         mp.setOnSeekCompleteListener(this);
         setPlayerState(mp, PlayerState.IDLE);
 
+        if (mContinuousMode == ContinuousMode.SINGLE) mp.setLooping(true);
+
         try {
             mp.setDataSource(pp.getProxyURL().toString());
             setPlayerState(mp, PlayerState.INITIALIZED);
@@ -499,8 +501,18 @@ public class Boombox extends Thread
     }
 
     public void setContinuousMode(ContinuousMode continuousMode) {
-        // TODO: handle transitions between old and new modes appropriately
+        if (mContinuousMode == continuousMode) return;
+
+        ContinuousMode oldMode = mContinuousMode;
         mContinuousMode = continuousMode;
+
+        if (oldMode == ContinuousMode.SINGLE) {
+            setLooping(false);
+        }
+
+        if (mContinuousMode == ContinuousMode.SINGLE) {
+            setLooping(true);
+        }
     }
 
     public ContinuousMode getContinuousMode() {
@@ -535,6 +547,14 @@ public class Boombox extends Thread
 
             return (!state.isPrepared() || mp.getDuration() == -1)
                     ? providerDuration : mp.getDuration();
+        }
+    }
+
+    private void setLooping(boolean looping) {
+        synchronized (mPlayers) {
+            for (MediaPlayer player : mPlayers) {
+                player.setLooping(looping);
+            }
         }
     }
 
