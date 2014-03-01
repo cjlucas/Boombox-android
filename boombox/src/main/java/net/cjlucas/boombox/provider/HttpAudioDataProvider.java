@@ -11,13 +11,13 @@ import java.net.URL;
 public class HttpAudioDataProvider extends AudioDataProvider {
     private static final int TIMEOUT = 5000;
 
-    private URL url;
-    private HttpURLConnection conn;
-    private BufferedInputStream inStream;
+    private URL mUrl;
+    private HttpURLConnection mConn;
+    private BufferedInputStream mInStream;
 
     public HttpAudioDataProvider(URL url, Object id) {
         super(id);
-        this.url = url;
+        mUrl = url;
     }
 
     public HttpAudioDataProvider(URL url) {
@@ -25,17 +25,17 @@ public class HttpAudioDataProvider extends AudioDataProvider {
     }
 
     public long getLength() {
-        return this.conn.getContentLength();
+        return mConn.getContentLength();
     }
 
     public boolean prepare() {
         try {
-            this.conn = (HttpURLConnection) this.url.openConnection();
-            this.conn.setConnectTimeout(TIMEOUT);
-            this.conn.setReadTimeout(TIMEOUT);
+            mConn = (HttpURLConnection) mUrl.openConnection();
+            mConn.setConnectTimeout(TIMEOUT);
+            mConn.setReadTimeout(TIMEOUT);
 
-            this.conn.connect();
-            this.inStream = new BufferedInputStream(this.conn.getInputStream());
+            mConn.connect();
+            mInStream = new BufferedInputStream(mConn.getInputStream());
         } catch (SocketTimeoutException e) {
             e.printStackTrace();
             return false;
@@ -49,16 +49,16 @@ public class HttpAudioDataProvider extends AudioDataProvider {
 
     public int provideData(byte[] buffer) {
         try {
-            return this.inStream.read(buffer);
+            return mInStream.read(buffer);
         } catch (IOException e) {
             return STATUS_ERROR_OCCURED;
         }
     }
 
     public void release() {
-        if (this.inStream != null) {
+        if (mInStream != null) {
             try {
-                this.inStream.close();
+                mInStream.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }

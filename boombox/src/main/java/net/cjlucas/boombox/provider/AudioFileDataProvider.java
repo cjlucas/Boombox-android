@@ -2,6 +2,7 @@ package net.cjlucas.boombox.provider;
 
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.util.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,13 +10,15 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 public class AudioFileDataProvider extends AudioDataProvider {
-    private File file;
-    private FileInputStream inStream;
-    private long duration;
+    private static final String TAG = "AudioFileDataProvider";
+
+    private File mFile;
+    private FileInputStream mInStream;
+    private long mDuration;
 
     public AudioFileDataProvider(File file, Object id) {
         super(id);
-        this.file = file;
+        mFile = file;
     }
 
     public AudioFileDataProvider(File file) {
@@ -24,30 +27,31 @@ public class AudioFileDataProvider extends AudioDataProvider {
 
     @Override
     public long getDuration() {
-        if (this.duration == 0) {
+        if (mDuration == 0) {
             MediaExtractor ext = new MediaExtractor();
             try {
-                ext.setDataSource(this.file.getAbsolutePath());
+                ext.setDataSource(mFile.getAbsolutePath());
 
                 MediaFormat mf = ext.getTrackFormat(0);
-                this.duration = mf.getLong(MediaFormat.KEY_DURATION) / 1000;
+                mDuration = mf.getLong(MediaFormat.KEY_DURATION) / 1000;
             } catch (IOException e) {
+                Log.e(TAG, "Couldn't get duration");
             }
 
             ext.release();
         }
 
-        return this.duration;
+        return mDuration;
     }
 
     @Override
     public long getLength() {
-        return this.file.length();
+        return mFile.length();
     }
 
     public boolean prepare() {
         try {
-            this.inStream = new FileInputStream(this.file);
+            mInStream = new FileInputStream(mFile);
             return true;
         } catch (FileNotFoundException e) {
             return false;
@@ -56,22 +60,21 @@ public class AudioFileDataProvider extends AudioDataProvider {
 
     public int provideData(byte[] buffer) {
         try {
-            int size = this.inStream.read(buffer);
-            return size;
+            return mInStream.read(buffer);
         } catch (IOException e) {
             return STATUS_ERROR_OCCURED;
         }
     }
 
     public void release() {
-        if (this.inStream == null) {
+        if (mInStream == null) {
             return;
         }
 
         try {
-            this.inStream.close();
+            mInStream.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "IOException when closing input stream");
         }
     }
 }

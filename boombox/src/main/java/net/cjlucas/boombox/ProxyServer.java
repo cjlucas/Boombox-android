@@ -2,62 +2,63 @@ package net.cjlucas.boombox;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
 
 public class ProxyServer extends Thread {
-    private String host;
-    private int port;
-    private ServerSocket serverSocket;
-    private DataForwarder currentForwarder;
-    private long contentLength;
-    private boolean running;
+    private String mHost;
+    private int mPort;
+    private ServerSocket mServerSocket;
+    private DataForwarder mCurrentForwarder;
+    private long mContentLength;
+    private boolean mRunning;
 
     private class DataForwarder extends Thread {
-        private Socket conn;
-        private boolean waitingForData;
+        private Socket mConn;
+        private boolean mWaitingForData;
 
         public DataForwarder(Socket conn) {
             setPriority(Thread.MIN_PRIORITY);
-            this.conn = conn;
+            mConn = conn;
         }
 
         public void forwardData(byte[] data) {
             try {
                 //System.out.println( String.format("DataForwarder: writing %d bytes to outputStream", data.length) );
-                this.conn.getOutputStream().write(data, 0, data.length);
+                mConn.getOutputStream().write(data, 0, data.length);
             } catch (IOException e) {
                 e.printStackTrace();
+                stopServer();
             }
         }
 
         public void close() {
-            this.waitingForData = false;
+            mWaitingForData = false;
         }
 
         public void run() {
-            this.waitingForData = true;
+            mWaitingForData = true;
 
-            while (this.waitingForData) {
+            while (mWaitingForData) {
                 try {
                     Thread.sleep(50);
-                } catch (Exception e) {
+                } catch (InterruptedException e) {
+                    stopServer();
                 }
             }
         }
     }
 
     public ProxyServer() {
-        this.host = "127.0.0.1";
-        this.port = 0;
+        mHost = "127.0.0.1";
+        mPort = 0;
     }
 
     public ProxyServer(int port) {
         this();
-        this.port = port;
+        mPort = port;
     }
 
     public URL getURL() {
@@ -70,36 +71,40 @@ public class ProxyServer extends Thread {
     }
 
     public int getPort() {
-        return this.serverSocket.getLocalPort();
+        return mServerSocket.getLocalPort();
+    }
+
+    public boolean isRunning() {
+        return mRunning;
     }
 
     public void setContentLength(long contentLength) {
-        this.contentLength = contentLength;
+        mContentLength = contentLength;
     }
 
     public boolean hasConnection() {
-        return this.currentForwarder != null;
+        return mCurrentForwarder != null;
     }
 
     public void sendData(byte[] data) {
-        if (this.currentForwarder == null) {
+        if (mCurrentForwarder == null) {
             System.err.println("No forwarder available");
             return;
         }
 
-        this.currentForwarder.forwardData(data);
+        mCurrentForwarder.forwardData(data);
     }
 
     public void runForever() {
 
-        this.running = true;
+        mRunning = true;
 
-        while (this.running) {
+        while (mRunning) {
             Socket s = accept();
             System.out.println("ProxyServer: got a connection!");
             write(s, "HTTP/1.1 200 OK\r\n");
-            if (this.contentLength > 0) {
-                write(s, "Content-Length: " + this.contentLength + "\r\n");
+            if (mContentLength > 0) {
+                write(s, "Content-Length: " + mContentLength + "\r\n");
             }
 
             write(s, "\r\n");
@@ -117,14 +122,15 @@ public class ProxyServer extends Thread {
                 continue;
             }
 
-            this.currentForwarder = new DataForwarder(s);
-            this.currentForwarder.start();
+            mCurrentForwarder = new DataForwarder(s);
+            mCurrentForwarder.start();
             try {
-                this.currentForwarder.join();
+                mCurrentForwarder.join();
             } catch (InterruptedException e) {
                 e.printStackTrace();
+                stopServer();
             } finally {
-                this.currentForwarder = null;
+                mCurrentForwarder = null;
             }
 
             close(s);
@@ -139,6 +145,7 @@ public class ProxyServer extends Thread {
             s.getOutputStream().write(str.getBytes(), 0, str.length());
         } catch (IOException e) {
             e.printStackTrace();
+            stopServer();
         }
     }
 
@@ -148,7 +155,7 @@ public class ProxyServer extends Thread {
 
     public boolean startServer() {
         try {
-            this.serverSocket = new ServerSocket(this.port);
+            mServerSocket = new ServerSocket(mPort);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -157,22 +164,21 @@ public class ProxyServer extends Thread {
     }
 
     public void stopServer() {
-        if (this.currentForwarder != null) {
-            this.currentForwarder.close();
+        if (mCurrentForwarder != null) {
+            mCurrentForwarder.close();
         }
 
-        this.running = false;
+        mRunning = false;
     }
 
     private Socket accept() {
-        Socket s = null;
         try {
-            return this.serverSocket.accept();
+            return mServerSocket.accept();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        return s;
+        return null;
     }
 
     private void close(Socket socket) {
@@ -185,8 +191,8 @@ public class ProxyServer extends Thread {
 
     private void tearDown() {
         try {
-            if (this.serverSocket != null) {
-                this.serverSocket.close();
+            if (mServerSocket != null) {
+                mServerSocket.close();
             }
         } catch (IOException e) {
             e.printStackTrace();
