@@ -600,7 +600,7 @@ public class Boombox extends Thread
 
     public void onBufferingUpdate(MediaPlayer player, int percent)
     {
-        logi("onBufferingUpdate player: %s, percent: %d", player, percent);
+        //logi("onBufferingUpdate player: %s, percent: %d", player, percent);
 
         MediaPlayer tailPlayer = this.players.get(this.players.size() - 1);
 
@@ -645,6 +645,12 @@ public class Boombox extends Thread
     public boolean onInfo(MediaPlayer player, int what, int extra)
     {
         logi("onInfo player: %s what: %d, extra: %d", player, what, extra);
+
+        if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+            notifyBufferingUpdate(player, true /* waitingForData */);
+        } else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
+            notifyBufferingUpdate(player, false /* waitingForData */);
+        }
 
         return false;
     }
@@ -809,6 +815,19 @@ public class Boombox extends Thread
             notifyPlaylistCompletion();
         } else {
             notifyPlaybackStart(nextProvider);
+        }
+    }
+
+    private void notifyBufferingUpdate(MediaPlayer player, boolean waitingForData)
+    {
+        if (this.infoListener == null) return;
+
+        AudioDataProvider provider = this.playerProviderMap.get(player);
+
+        if (waitingForData) {
+            this.infoListener.onBufferingStart(this, provider);
+        } else {
+            this.infoListener.onBufferingEnd(this, provider);
         }
     }
 

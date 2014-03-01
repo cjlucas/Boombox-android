@@ -12,6 +12,10 @@ public interface BoomboxInfoListener
 
     void onPlaylistCompletion(Boombox boombox);
 
+    void onBufferingStart(Boombox boombox, AudioDataProvider provider);
+
+    void onBufferingEnd(Boombox boombox, AudioDataProvider provider);
+
     void onBufferingUpdate(Boombox           boombox,
                            AudioDataProvider provider,
                            int               percentComplete);
