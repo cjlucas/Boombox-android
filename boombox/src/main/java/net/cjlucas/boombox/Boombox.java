@@ -539,9 +539,6 @@ public class Boombox extends Thread
     public void onCompletion(MediaPlayer player) {
         logi("onCompletion player: %s", player);
 
-        // update mPlaylist cursor, or reset if mPlaylist is complete
-        mPlaylistCursor = Math.max(0, getNextPlaylistCursor());
-
         notifyPlaybackCompletion(player, mPlayerProviderMap.get(player));
         setPlayerState(player, PlayerState.STOPPED);
         releasePlayer(player); // we want this synchronous so next code is valid
@@ -551,7 +548,10 @@ public class Boombox extends Thread
 
         // for safety, if there wasn't a queued player but there is a next provider, queue it now.
         if (currentPlayer == null && hasNext()) {
-            queueProvider(getNextProvider());
+            playNext();
+        } else {
+            // update mPlaylist cursor, or reset if mPlaylist is complete
+            mPlaylistCursor = Math.max(0, getNextPlaylistCursor());
         }
     }
 
