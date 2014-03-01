@@ -27,7 +27,8 @@ public class Boombox extends Thread
         MediaPlayer.OnErrorListener,
         MediaPlayer.OnInfoListener,
         MediaPlayer.OnPreparedListener,
-        MediaPlayer.OnSeekCompleteListener {
+        MediaPlayer.OnSeekCompleteListener,
+        Handler.Callback{
     private static final String TAG = "Boombox";
 
     private final List<AudioDataProvider> mProviders;
@@ -44,7 +45,7 @@ public class Boombox extends Thread
     private boolean mShuffleMode;
     private ContinuousMode mContinuousMode;
 
-    private Handler handler;
+    private Handler mHandler;
 
     public enum ContinuousMode {
         NONE, SINGLE, PLAYLIST
@@ -86,8 +87,8 @@ public class Boombox extends Thread
 
         public boolean in(MessageType... types) {
             int bitmask = 0;
-            for (int i = 0; i < types.length; i++) {
-                bitmask = bitmask | types[i].value;
+            for (MessageType type : types) {
+                bitmask = bitmask | type.value;
             }
 
             return (value & bitmask) > 0;
@@ -118,31 +119,7 @@ public class Boombox extends Thread
     @Override
     public void run() {
         Looper.prepare();
-
-        this.handler = new Handler() {
-            public void handleMessage(Message message) {
-                logi("%s", message);
-                switch (MessageType.forValue(message.what)) {
-                    case RELEASE_PLAYER:
-                        handleReleasePlayer(message);
-                        break;
-                    case RELEASE_PROCESSOR:
-                        handleReleaseProcessor(message);
-                        break;
-                    case PLAY_PROVIDER:
-                        handlePlayProvider(message);
-                        break;
-                    case SHUFFLE_PLAYLIST:
-                        handleShufflePlaylist(message);
-                        break;
-                    case RESET_PLAYLIST:
-                        handleResetPlaylist(message);
-                        break;
-                    default:
-                        throw new RuntimeException("Unhandled message: " + message);
-                }
-            }
-        };
+        mHandler = new Handler(this);
 
         Looper.loop();
     }
@@ -181,28 +158,6 @@ public class Boombox extends Thread
         }
     }
 
-    /*
-     *    private void releaseProcessor(AudioDataProvider mProvider)
-     *    {
-     *        if (mProvider == null) {
-     *            return;
-     *        }
-     *
-     *        ProviderProcessor ppToRemove = null;
-     *
-     *        synchronized (this.mProcessors) {
-     *            for (ProviderProcessor pp : this.mProcessors) {
-     *                if (pp.getProvider() == mProvider) {
-     *                    ppToRemove = pp;
-     *                    break;
-     *                }
-     *            }
-     *        }
-     *
-     *        releaseProcessor(ppToRemove);
-     *    }
-     */
-
     private void releasePlayer(MediaPlayer player) {
         synchronized (player) {
             setPlayerState(player, PlayerState.RELEASING);
@@ -225,6 +180,8 @@ public class Boombox extends Thread
     }
 
     private void setPlayerState(MediaPlayer player, PlayerState state) {
+        if (player == null) return;
+
         mPlayerStateMap.put(player, state);
     }
 
@@ -370,17 +327,15 @@ public class Boombox extends Thread
             int index = 0;
 
             for (AudioDataProvider provider : mPlaylist) {
-                if (provider.getId().equals(id)) {
-                    break;
-                }
+                if (provider.getId().equals(id)) break;
                 index++;
             }
-
-            // TODO: throw exception if mProvider was not found
 
             if (index < mPlaylist.size()) {
                 mPlaylistCursor = index;
                 reqPlayProvider(mPlaylist.get(index));
+            } else {
+                throw new RuntimeException("No provider found with the given id");
             }
         }
     }
@@ -589,10 +544,15 @@ public class Boombox extends Thread
 
         notifyPlaybackCompletion(player, mPlayerProviderMap.get(player));
         setPlayerState(player, PlayerState.STOPPED);
-        releasePlayer(player);
+        releasePlayer(player); // we want this synchronous so next code is valid
 
-        // TODO: figure out when to set started state for player
-        // that was set as the next player for the player that just completed
+        MediaPlayer currentPlayer = getCurrentPlayer();
+        setPlayerState(currentPlayer, PlayerState.STARTED);
+
+        // for safety, if there wasn't a queued player but there is a next provider, queue it now.
+        if (currentPlayer == null && hasNext()) {
+            queueProvider(getNextProvider());
+        }
     }
 
     public boolean onError(MediaPlayer player, int what, int extra) {
@@ -638,16 +598,16 @@ public class Boombox extends Thread
     // Request senders
 
     private Message obtainMessage(MessageType type, Object obj) {
-        return handler.obtainMessage(type.value, obj);
+        return mHandler.obtainMessage(type.value, obj);
     }
 
     private boolean hasMessages(MessageType type) {
-        return handler.hasMessages(type.value);
+        return mHandler.hasMessages(type.value);
     }
 
     private void reqReleasePlayer(MediaPlayer player) {
         Message msg = obtainMessage(MessageType.RELEASE_PLAYER, player);
-        handler.sendMessage(msg);
+        mHandler.sendMessage(msg);
     }
 
     private void reqReleaseAllPlayers() {
@@ -660,7 +620,7 @@ public class Boombox extends Thread
 
     private void reqReleaseProcessor(ProviderProcessor pp) {
         Message msg = obtainMessage(MessageType.RELEASE_PROCESSOR, pp);
-        handler.sendMessage(msg);
+        mHandler.sendMessage(msg);
     }
 
     private void reqReleaseAllProcessors() {
@@ -676,20 +636,45 @@ public class Boombox extends Thread
         reqReleaseAllProcessors();
 
         Message msg = obtainMessage(MessageType.PLAY_PROVIDER, provider);
-        handler.sendMessage(msg);
+        mHandler.sendMessage(msg);
     }
 
     private void reqShufflePlaylist() {
         Message msg = obtainMessage(MessageType.SHUFFLE_PLAYLIST, null);
-        handler.sendMessage(msg);
+        mHandler.sendMessage(msg);
     }
 
     private void reqResetPlaylist() {
         Message msg = obtainMessage(MessageType.RESET_PLAYLIST, null);
-        handler.sendMessage(msg);
+        mHandler.sendMessage(msg);
     }
 
     // Message handlers
+
+    @Override
+    public boolean handleMessage(Message message) {
+        switch (MessageType.forValue(message.what)) {
+            case RELEASE_PLAYER:
+                handleReleasePlayer(message);
+                break;
+            case RELEASE_PROCESSOR:
+                handleReleaseProcessor(message);
+                break;
+            case PLAY_PROVIDER:
+                handlePlayProvider(message);
+                break;
+            case SHUFFLE_PLAYLIST:
+                handleShufflePlaylist(message);
+                break;
+            case RESET_PLAYLIST:
+                handleResetPlaylist(message);
+                break;
+            default:
+                throw new RuntimeException("Unhandled message: " + message);
+        }
+
+        return true;
+    }
 
     private void handleReleasePlayer(Message msg) {
         releasePlayer((MediaPlayer) msg.obj);
@@ -884,9 +869,7 @@ public class Boombox extends Thread
 
         private byte[] shrinkBuffer(byte[] buffer, int size) {
             byte[] newBuffer = new byte[size];
-            for (int i = 0; i < size; i++) {
-                newBuffer[i] = buffer[i];
-            }
+            System.arraycopy(buffer, 0, newBuffer, 0, size);
 
             return newBuffer;
         }
