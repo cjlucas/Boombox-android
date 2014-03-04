@@ -2,6 +2,7 @@ package net.cjlucas.boomboxdemo;
 
 import android.app.Activity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -32,7 +33,6 @@ public class MainActivity extends Activity
     private static final String TAG = "MainActivity";
     private static final int UPDATE_UI_INTERVAL = 100;
 
-    private Boombox mBoombox;
     private Timer mUpdateUiTimer;
 
     private Button mPrevButton;
@@ -48,7 +48,7 @@ public class MainActivity extends Activity
     private int mSeekProgress;
 
 
-    private TimerTask mUpdateUiTask = new TimerTask() {
+    private class UpdateUiTimerTask extends TimerTask {
         public void run() {
             updateUi();
         }
@@ -60,14 +60,43 @@ public class MainActivity extends Activity
         setContentView(R.layout.activity_main);
 
         System.out.println("MainActivity: onCreate");
-        getBoombox();
+        BoomboxSingleton.getInstance().setInfoListener(this);
+        if (BoomboxSingleton.getInstance().getPlaylist().size() > 0) return;
 
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(getResources().openRawResource(R.raw.sources)));
+            String line = null;
+
+            while (true) {
+                line = in.readLine();
+                if (line == null) {
+                    break;
+                }
+
+                URL url = new URL(line);
+                String fileName = url.toString().substring(
+                        url.toString().lastIndexOf("/") + 1);
+                System.out.println(fileName);
+                BoomboxSingleton.getInstance().addProvider(new HttpAudioDataProvider(url, fileName));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
 
+        Log.i(TAG, "onPostCreate");
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        Log.i(TAG, "onStart");
         mPrevButton = (Button) findViewById(R.id.prev_btn);
         mNextButton = (Button) findViewById(R.id.next_btn);
         mPlayPauseButton = (Button) findViewById(R.id.play_pause_btn);
@@ -83,16 +112,31 @@ public class MainActivity extends Activity
         mSeekBar.setOnSeekBarChangeListener(this);
         mIsSeeking = false;
 
-        mUpdateUiTimer = new Timer();
-        mUpdateUiTimer.schedule(mUpdateUiTask, 0, UPDATE_UI_INTERVAL);
+        System.out.println(mUpdateUiTimer);
 
+        mUpdateUiTimer = new Timer();
+        mUpdateUiTimer.schedule(new UpdateUiTimerTask(), 0, UPDATE_UI_INTERVAL);
         updateUi();
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        Log.i(TAG, "onResume");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.i(TAG, "onPause");
+    }
+
+    @Override
     protected void onStop() {
+        Log.i(TAG, "onStop");
         mUpdateUiTimer.cancel();
         mUpdateUiTimer = null;
+        getBoombox().setInfoListener(null);
 
         super.onStop();
     }
@@ -105,31 +149,7 @@ public class MainActivity extends Activity
     }
 
     public Boombox getBoombox() {
-        if (mBoombox == null) {
-            mBoombox = new Boombox(this);
-            mBoombox.start();
-
-
-            try {
-                BufferedReader in = new BufferedReader(new InputStreamReader(getResources().openRawResource(R.raw.sources)));
-                String line = null;
-
-                while (true) {
-                    line = in.readLine();
-                    if (line == null) {
-                        break;
-                    }
-
-                    URL url = new URL(line);
-                    mBoombox.addProvider(new HttpAudioDataProvider(url));
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        return mBoombox;
+        return BoomboxSingleton.getInstance();
     }
 
     public List<AudioDataProvider> getProviders() {
@@ -189,22 +209,27 @@ public class MainActivity extends Activity
     }
 
     public void togglePlayPauseClicked(View v) {
-        mBoombox.togglePlayPause();
+        getBoombox().togglePlayPause();
         updateUi();
     }
 
     public void playNextClicked(View view) {
-        mBoombox.playNext();
+        getBoombox().playNext();
         updateUi();
     }
 
     public void playPreviousClicked(View view) {
-        mBoombox.playPrevious();
+        getBoombox().playPrevious();
         updateUi();
     }
 
     public void shuffleModeSwitchChanged(View view) {
-        mBoombox.setShuffleMode(((Switch) view).isChecked());
+        getBoombox().setShuffleMode(((Switch) view).isChecked());
+    }
+
+    public void showPlaylist(View view) {
+        Intent intent = new Intent(this, ProviderListActivity.class);
+        startActivity(intent);
     }
 
     private String sformat(String format, Object...args) {
@@ -262,7 +287,7 @@ public class MainActivity extends Activity
                 break;
         }
 
-        mBoombox.setContinuousMode(mode);
+        getBoombox().setContinuousMode(mode);
         updateUi();
     }
 
