@@ -317,9 +317,13 @@ public class Boombox extends Thread
         }
     }
 
+    public void play(int position) {
+        mPlaylistCursor = position;
+        reqPlayProvider(mPlaylist.get(position));
+    }
+
     public void play(AudioDataProvider provider) {
-        mPlaylistCursor = mPlaylist.indexOf(provider);
-        reqPlayProvider(provider);
+        play(mPlaylist.indexOf(provider));
     }
 
     public void play(Object id) {
