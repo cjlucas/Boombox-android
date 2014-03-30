@@ -1,16 +1,38 @@
 package net.cjlucas.boomboxdemo;
 
 import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import net.cjlucas.boombox.Boombox;
+
 public class ProviderListActivity extends Activity {
+
+    private ServiceConnection mServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            Boombox boombox = ((BoomboxService.LocalBinder)iBinder).getBoombox();
+            ((ProviderListFragment)getFragmentManager().findFragmentById(R.id.provider_list_fragment)).setBoombox(boombox);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            unbindService(this);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_provider_list);
+
+        Intent intent = new Intent(this, BoomboxService.class);
+        bindService(intent, mServiceConnection, 0);
     }
 
 
@@ -34,4 +56,9 @@ public class ProviderListActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unbindService(mServiceConnection);
+    }
 }

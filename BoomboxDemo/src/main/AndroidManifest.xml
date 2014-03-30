@@ -29,6 +29,7 @@
             android:name="net.cjlucas.boomboxdemo.ProviderListActivity"
             android:label="@string/title_activity_provider_list" >
         </activity>
+        <service android:name=".BoomboxService"/>
     </application>
 
 </manifest>

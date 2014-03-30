@@ -2,8 +2,12 @@ package net.cjlucas.boomboxdemo;
 
 import android.app.Activity;
 
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
@@ -33,6 +37,7 @@ public class MainActivity extends Activity
     private static final String TAG = "MainActivity";
     private static final int UPDATE_UI_INTERVAL = 100;
 
+    private Boombox mBoombox;
     private Timer mUpdateUiTimer;
 
     private Button mPrevButton;
@@ -59,30 +64,28 @@ public class MainActivity extends Activity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        System.out.println("MainActivity: onCreate");
-        BoomboxSingleton.getInstance().setInfoListener(this);
-        if (BoomboxSingleton.getInstance().getPlaylist().size() > 0) return;
-
-        try {
-            BufferedReader in = new BufferedReader(new InputStreamReader(getResources().openRawResource(R.raw.sources)));
-            String line = null;
-
-            while (true) {
-                line = in.readLine();
-                if (line == null) {
-                    break;
+        Intent intent = new Intent(this, BoomboxService.class);
+        startService(intent);
+        bindService(intent, new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                mBoombox = ((BoomboxService.LocalBinder)iBinder).getBoombox();
+                System.err.println("OMGHERE " + mBoombox);
+                populateProviders();
+                ProviderListFragment fragment = ((ProviderListFragment)getFragmentManager().findFragmentById(R.id.fragment));
+                System.err.println("DUDEHEREYO " + fragment);
+                if (fragment != null) {
+                    fragment.setBoombox(mBoombox);
                 }
-
-                URL url = new URL(line);
-                String fileName = url.toString().substring(
-                        url.toString().lastIndexOf("/") + 1);
-                System.out.println(fileName);
-                BoomboxSingleton.getInstance().addProvider(new HttpAudioDataProvider(url, fileName));
             }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            @Override
+            public void onServiceDisconnected(ComponentName componentName) {
+
+            }
+        }, Context.BIND_AUTO_CREATE);
+
+        System.out.println("MainActivity: onCreate");
     }
 
     @Override
@@ -148,8 +151,31 @@ public class MainActivity extends Activity
         return true;
     }
 
+    private void populateProviders() {
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(getResources().openRawResource(R.raw.sources)));
+            String line = null;
+
+            while (true) {
+                line = in.readLine();
+                if (line == null) {
+                    break;
+                }
+
+                URL url = new URL(line);
+                String fileName = url.toString().substring(
+                        url.toString().lastIndexOf("/") + 1);
+                System.out.println(fileName);
+                mBoombox.addProvider(new HttpAudioDataProvider(url, fileName));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public Boombox getBoombox() {
-        return BoomboxSingleton.getInstance();
+        return mBoombox;
     }
 
     public List<AudioDataProvider> getProviders() {
@@ -160,6 +186,8 @@ public class MainActivity extends Activity
     private void updateUi() {
         runOnUiThread(new Runnable() {
             public void run() {
+                if (getBoombox() == null) return;
+
                 mPrevButton.setEnabled(getBoombox().hasPrevious());
                 mNextButton.setEnabled(getBoombox().hasNext());
 

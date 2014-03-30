@@ -12,6 +12,7 @@ import android.view.LayoutInflater;
 import android.widget.ArrayAdapter;
 import android.widget.*;
 
+import net.cjlucas.boombox.Boombox;
 import net.cjlucas.boombox.provider.AudioDataProvider;
 
 import java.util.List;
@@ -19,6 +20,8 @@ import java.util.Locale;
 
 public class ProviderListFragment extends ListFragment
 {
+    private Boombox mBoombox;
+
 	public interface OnProviderSelectedListener
 	{
 		void onProviderSelected(int index);
@@ -64,18 +67,23 @@ public class ProviderListFragment extends ListFragment
 	{
 		super.onActivityCreated(savedInstanceState);
 
-		this.adapter = new PlaylistAdapter(getActivity(), android.R.layout.simple_list_item_1, BoomboxSingleton.getInstance().getPlaylist());
-		setListAdapter(this.adapter);
-
-		System.out.println( "omghere: " + this.adapter.getCount() );
 
 		System.out.println("I'm being attached!");
 	}
 
+    public void setBoombox(Boombox boombox) {
+        mBoombox = boombox;
+
+        this.adapter = new PlaylistAdapter(getActivity(), android.R.layout.simple_list_item_1, boombox.getPlaylist());
+        setListAdapter(this.adapter);
+
+        System.out.println( "omghere: " + this.adapter.getCount() );
+    }
+
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
         System.out.println(position + " clicked");
-        BoomboxSingleton.getInstance().play(position);
+        mBoombox.play(position);
         if (getActivity() instanceof ProviderListActivity) getActivity().finish();
     }
 
