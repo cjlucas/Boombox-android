@@ -38,7 +38,7 @@ public class MainActivity extends Activity
     private static final String TAG = "MainActivity";
     private static final int UPDATE_UI_INTERVAL = 100;
 
-    private Boombox mBoombox;
+    private BoomboxService.LocalBinder mBoomboxServiceBinder;
     private Timer mUpdateUiTimer;
 
     private Button mPrevButton;
@@ -55,21 +55,22 @@ public class MainActivity extends Activity
     private ServiceConnection mServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-            mBoombox = ((BoomboxService.LocalBinder)iBinder).getBoombox();
+            mBoomboxServiceBinder = (BoomboxService.LocalBinder)iBinder;
+            getBoombox().registerInfoListener(MainActivity.this);
 
-            if (mBoombox.getPlaylist().size() == 0) {
+            if (getBoombox().getPlaylist().size() == 0) {
                 populateProviders();
             }
 
             Fragment fragment = getFragmentManager().findFragmentById(R.id.fragment);
             if (fragment != null) {
-                ((ProviderListFragment)fragment).setBoombox(mBoombox);
+                ((ProviderListFragment)fragment).setBoombox(getBoombox());
             }
         }
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
-
+            getBoombox().unregisterInfoListener(MainActivity.this);
         }
     };
 
@@ -143,7 +144,6 @@ public class MainActivity extends Activity
         Log.i(TAG, "onStop");
         mUpdateUiTimer.cancel();
         mUpdateUiTimer = null;
-        getBoombox().setInfoListener(null);
 
         super.onStop();
     }
@@ -170,7 +170,7 @@ public class MainActivity extends Activity
                 String fileName = url.toString().substring(
                         url.toString().lastIndexOf("/") + 1);
                 System.out.println(fileName);
-                mBoombox.addProvider(new HttpAudioDataProvider(url, fileName));
+                getBoombox().addProvider(new HttpAudioDataProvider(url, fileName));
             }
 
         } catch (Exception e) {
@@ -179,7 +179,7 @@ public class MainActivity extends Activity
     }
 
     public Boombox getBoombox() {
-        return mBoombox;
+        return mBoomboxServiceBinder != null ? mBoomboxServiceBinder.getBoombox() : null;
     }
 
     public List<AudioDataProvider> getProviders() {

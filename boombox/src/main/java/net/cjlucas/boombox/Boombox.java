@@ -28,7 +28,7 @@ public class Boombox extends Thread
         MediaPlayer.OnInfoListener,
         MediaPlayer.OnPreparedListener,
         MediaPlayer.OnSeekCompleteListener,
-        Handler.Callback{
+        Handler.Callback {
     private static final String TAG = "Boombox";
 
     private final List<AudioDataProvider> mProviders;
@@ -40,7 +40,7 @@ public class Boombox extends Thread
 
     private int mPlaylistCursor;
 
-    private BoomboxInfoListener mInfoListener;
+    private BoomboxInfoListenerList mInfoListeners;
 
     private boolean mShuffleMode;
     private ContinuousMode mContinuousMode;
@@ -105,15 +105,18 @@ public class Boombox extends Thread
         mPlaylistCursor = 0;
         mShuffleMode = false;
         mContinuousMode = ContinuousMode.NONE;
+        mInfoListeners = new BoomboxInfoListenerList();
     }
 
-    public Boombox(BoomboxInfoListener infoListener) {
-        this();
-        setInfoListener(infoListener);
+    public void registerInfoListener(BoomboxInfoListener infoListener) {
+        if (infoListener == null) {
+            throw new IllegalArgumentException("infoListener cannot be null");
+        }
+        mInfoListeners.add(infoListener);
     }
 
-    public void setInfoListener(BoomboxInfoListener infoListener) {
-        mInfoListener = infoListener;
+    public void unregisterInfoListener(BoomboxInfoListener infoListener) {
+        mInfoListeners.remove(infoListener);
     }
 
     @Override
@@ -176,7 +179,6 @@ public class Boombox extends Thread
 
     public void release() {
         reset();
-        setInfoListener(null);
     }
 
     private void setPlayerState(MediaPlayer player, PlayerState state) {
@@ -708,19 +710,15 @@ public class Boombox extends Thread
     // BoomboxInfoListener helpers
 
     private void notifyPlaybackStart(AudioDataProvider provider) {
-        if (mInfoListener == null) {
-            return;
+        for (BoomboxInfoListener infoListener : mInfoListeners) {
+            infoListener.onPlaybackStart(this, provider);
         }
-
-        mInfoListener.onPlaybackStart(this, provider);
     }
 
     private void notifyPlaylistCompletion() {
-        if (mInfoListener == null) {
-            return;
+        for (BoomboxInfoListener infoListener : mInfoListeners) {
+            infoListener.onPlaylistCompletion(this);
         }
-
-        mInfoListener.onPlaylistCompletion(this);
     }
 
     /**
@@ -728,12 +726,11 @@ public class Boombox extends Thread
      */
     private void notifyPlaybackCompletion(MediaPlayer mp,
                                           AudioDataProvider provider) {
-        if (mInfoListener == null) {
-            return;
-        }
-
         AudioDataProvider nextProvider = getProviderAfter(provider);
-        mInfoListener.onPlaybackCompletion(this, provider, nextProvider);
+
+        for (BoomboxInfoListener infoListener : mInfoListeners) {
+            infoListener.onPlaybackCompletion(this, provider, nextProvider);
+        }
 
         /*
          * If there is no next mProvider, we can assume the mPlaylist is complete,
@@ -747,23 +744,21 @@ public class Boombox extends Thread
     }
 
     private void notifyBufferingUpdate(MediaPlayer player, boolean waitingForData) {
-        if (mInfoListener == null) return;
-
         AudioDataProvider provider = this.mPlayerProviderMap.get(player);
 
-        if (waitingForData) {
-            mInfoListener.onBufferingStart(this, provider);
-        } else {
-            mInfoListener.onBufferingEnd(this, provider);
+        for (BoomboxInfoListener infoListener : mInfoListeners) {
+            if (waitingForData) {
+                infoListener.onBufferingStart(this, provider);
+            } else {
+                infoListener.onBufferingEnd(this, provider);
+            }
         }
     }
 
     private void notifyBufferingUpdate(AudioDataProvider provider, int percent) {
-        if (mInfoListener == null) {
-            return;
+        for (BoomboxInfoListener infoListener : mInfoListeners) {
+            infoListener.onBufferingUpdate(this, provider, percent);
         }
-
-        mInfoListener.onBufferingUpdate(this, provider, percent);
     }
 
     // Log helpers
