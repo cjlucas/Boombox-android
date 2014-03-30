@@ -2,6 +2,7 @@ package net.cjlucas.boomboxdemo;
 
 import android.app.Activity;
 
+import android.app.Fragment;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -51,13 +52,32 @@ public class MainActivity extends Activity
     private SeekBar mSeekBar;
     private boolean mIsSeeking;
     private int mSeekProgress;
+    private ServiceConnection mServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            mBoombox = ((BoomboxService.LocalBinder)iBinder).getBoombox();
 
+            if (mBoombox.getPlaylist().size() == 0) {
+                populateProviders();
+            }
+
+            Fragment fragment = getFragmentManager().findFragmentById(R.id.fragment);
+            if (fragment != null) {
+                ((ProviderListFragment)fragment).setBoombox(mBoombox);
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+
+        }
+    };
 
     private class UpdateUiTimerTask extends TimerTask {
         public void run() {
             updateUi();
         }
-    };
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,24 +86,6 @@ public class MainActivity extends Activity
 
         Intent intent = new Intent(this, BoomboxService.class);
         startService(intent);
-        bindService(intent, new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-                mBoombox = ((BoomboxService.LocalBinder)iBinder).getBoombox();
-                System.err.println("OMGHERE " + mBoombox);
-                populateProviders();
-                ProviderListFragment fragment = ((ProviderListFragment)getFragmentManager().findFragmentById(R.id.fragment));
-                System.err.println("DUDEHEREYO " + fragment);
-                if (fragment != null) {
-                    fragment.setBoombox(mBoombox);
-                }
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName componentName) {
-
-            }
-        }, Context.BIND_AUTO_CREATE);
 
         System.out.println("MainActivity: onCreate");
     }
@@ -126,12 +128,14 @@ public class MainActivity extends Activity
     protected void onResume() {
         super.onResume();
         Log.i(TAG, "onResume");
+        bindService(new Intent(this, BoomboxService.class), mServiceConnection, 0);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         Log.i(TAG, "onPause");
+        unbindService(mServiceConnection);
     }
 
     @Override
