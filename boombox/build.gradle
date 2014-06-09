@@ -1,4 +1,8 @@
 apply plugin: 'android-library'
+apply plugin: 'maven'
+
+version = "1.0.2"
+group = "net.cjlucas"
 
 android {
     compileSdkVersion 19
@@ -15,8 +19,42 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
 }
 
 dependencies {
     compile 'com.android.support:support-v4:+'
+}
+
+def coreAarFile = file('build/core.aar')
+artifacts {
+    archives coreAarFile
+}
+
+uploadArchives {
+    configuration = configurations.default
+    repositories.mavenDeployer {
+        repository(url: "file:///Users/chris/repos/maven")
+
+        pom.project {
+            name "Boombox"
+            packaging "aar"
+            description "An audio player for Android"
+            url "https://github.com/cjlucas/Boombox-android"
+
+            developers {
+                developer {
+                    id 'chrisjlucas'
+                    name 'Chris Lucas'
+                    email 'chris@chrisjlucas.com'
+                }
+            }
+        }
+
+    }
+
 }

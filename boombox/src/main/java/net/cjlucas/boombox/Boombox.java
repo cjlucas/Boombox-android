@@ -100,14 +100,18 @@ public class Boombox extends Thread
         mPlaylist = Collections.synchronizedList(new ArrayList<AudioDataProvider>());
         mPlayers = Collections.synchronizedList(new ArrayList<MediaPlayer>());
         mProcessors = Collections.synchronizedList(new ArrayList<ProviderProcessor>());
-        mPlayerProviderMap = new ConcurrentHashMap<MediaPlayer, AudioDataProvider>();
-        mPlayerStateMap = new ConcurrentHashMap<MediaPlayer, PlayerState>();
+        mPlayerProviderMap = new ConcurrentHashMap<>();
+        mPlayerStateMap = new ConcurrentHashMap<>();
         mPlaylistCursor = 0;
         mShuffleMode = false;
         mContinuousMode = ContinuousMode.NONE;
         mInfoListeners = new BoomboxInfoListenerList();
     }
 
+    /**
+     * Register for Boombox updates.
+     * @param infoListener
+     */
     public void registerInfoListener(BoomboxInfoListener infoListener) {
         if (infoListener == null) {
             throw new IllegalArgumentException("infoListener cannot be null");
@@ -115,6 +119,10 @@ public class Boombox extends Thread
         mInfoListeners.add(infoListener);
     }
 
+    /**
+     * Unregister from Boombox updates.
+     * @param infoListener
+     */
     public void unregisterInfoListener(BoomboxInfoListener infoListener) {
         mInfoListeners.remove(infoListener);
     }
@@ -129,6 +137,9 @@ public class Boombox extends Thread
 
     // Clean up
 
+    /**
+     * Release and clear all MediaPlayer and ProviderProcessor objects.
+     */
     private void resetPlayers() {
         synchronized (mPlayers) {
             for (MediaPlayer mp : mPlayers) {
@@ -146,6 +157,10 @@ public class Boombox extends Thread
         mProcessors.clear();
     }
 
+    /**
+     * Stop and release a ProviderProcessor object.
+     * @param pp
+     */
     private void releaseProcessor(ProviderProcessor pp) {
         pp.halt();
 
@@ -161,9 +176,14 @@ public class Boombox extends Thread
         }
     }
 
+    /**
+     * Stop and release a MediaPlayer object.
+     * @param player
+     */
     private void releasePlayer(MediaPlayer player) {
         synchronized (player) {
             setPlayerState(player, PlayerState.RELEASING);
+            player.reset();
             player.release();
             setPlayerState(player, PlayerState.RELEASED);
 
@@ -172,8 +192,13 @@ public class Boombox extends Thread
         }
     }
 
-    private void reset() {
+    /**
+     * Reset Boombox. This stops all playback and removes all providers.
+     */
+    public void reset() {
         resetPlayers();
+        mPlaylist.clear();
+        mProviders.clear();
         mPlaylistCursor = 0;
     }
 
@@ -189,6 +214,12 @@ public class Boombox extends Thread
 
     // Providers Management
 
+    /**
+     * Get the index of the next playlist item.
+     *
+     * @param index the current index
+     * @return the next index
+     */
     private int getFollowingPlaylistIndex(int index) {
         int newIndex = index + 1;
 
@@ -204,6 +235,12 @@ public class Boombox extends Thread
         return getFollowingPlaylistIndex(mPlaylistCursor);
     }
 
+    /**
+     * Get the index of the previous playlist item.
+     *
+     * @param index the current index
+     * @return the previous index
+     */
     private int getPrecedingPlaylistIndex(int index) {
         int newIndex = index - 1;
 
@@ -219,6 +256,10 @@ public class Boombox extends Thread
         return getPrecedingPlaylistIndex(mPlaylistCursor);
     }
 
+    /**
+     * Add AudioDataProvider to playlist.
+     * @param provider
+     */
     public void addProvider(AudioDataProvider provider) {
         mProviders.add(provider);
         mPlaylist.add(provider);
