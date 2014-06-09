@@ -142,16 +142,16 @@ public class Boombox extends Thread
      */
     private void resetPlayers() {
         synchronized (mPlayers) {
-            for (MediaPlayer mp : mPlayers) {
-                releasePlayer(mp);
-            }
+            ArrayList<MediaPlayer> players = new ArrayList<>(mPlayers);
+            for (MediaPlayer player : players)
+                releasePlayer(player);
         }
         mPlayers.clear();
 
-        synchronized (mProviders) {
-            for (ProviderProcessor pp : mProcessors) {
-                releaseProcessor(pp);
-            }
+        synchronized (mProcessors) {
+            ArrayList<ProviderProcessor> processors = new ArrayList<>(mProcessors);
+            for (ProviderProcessor processor : processors)
+                releaseProcessor(processor);
         }
 
         mProcessors.clear();
