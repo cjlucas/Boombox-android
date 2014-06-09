@@ -552,6 +552,15 @@ public class Boombox extends Thread
         }
     }
 
+    /**
+     * Check the current playback status
+     * @return
+     */
+    public boolean isPlaying() {
+        MediaPlayer mp = getCurrentPlayer();
+        return mp != null && mp.isPlaying();
+    }
+
     private void setLooping(boolean looping) {
         synchronized (mPlayers) {
             for (MediaPlayer player : mPlayers) {
