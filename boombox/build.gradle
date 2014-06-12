@@ -1,7 +1,7 @@
 apply plugin: 'android-library'
 apply plugin: 'maven'
 
-version = "1.0.2"
+version = "1.0.3"
 group = "net.cjlucas"
 
 android {
