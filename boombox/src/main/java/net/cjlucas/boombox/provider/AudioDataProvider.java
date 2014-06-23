@@ -5,6 +5,7 @@ public abstract class AudioDataProvider {
     public static final int STATUS_ERROR_OCCURED = -2;
 
     private Object id;
+    private boolean mIsPrepeared;
 
     public AudioDataProvider(Object id) {
         this.id = id;
@@ -22,9 +23,25 @@ public abstract class AudioDataProvider {
         return 0;
     }
 
-    public abstract boolean prepare();
+    final public boolean isPrepared() {
+        return mIsPrepeared;
+    }
+
+    /**
+     * The superclass implementation must be called.
+     * @return Whether the provider was successfully prepared
+     */
+    public boolean prepare() {
+        mIsPrepeared = true;
+        return true;
+    };
 
     public abstract int provideData(byte[] buffer);
 
-    public abstract void release();
+    /**
+     * The superclass implementation must be called.
+     */
+    public void release() {
+        mIsPrepeared = false;
+    };
 }

@@ -32,6 +32,7 @@ public class HttpAudioDataProvider extends AudioDataProvider {
     }
 
     public boolean prepare() {
+        super.prepare();
         try {
             mConn = (HttpURLConnection) mUrl.openConnection();
             mConn.setConnectTimeout(TIMEOUT);
@@ -59,6 +60,8 @@ public class HttpAudioDataProvider extends AudioDataProvider {
     }
 
     public void release() {
+        super.release();
+
         if (mInStream != null) {
             try {
                 mInStream.close();

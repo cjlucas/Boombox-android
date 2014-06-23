@@ -50,6 +50,8 @@ public class AudioFileDataProvider extends AudioDataProvider {
     }
 
     public boolean prepare() {
+        super.prepare();
+
         try {
             mInStream = new FileInputStream(mFile);
             return true;
@@ -67,6 +69,8 @@ public class AudioFileDataProvider extends AudioDataProvider {
     }
 
     public void release() {
+        super.release();
+
         if (mInStream == null) {
             return;
         }
