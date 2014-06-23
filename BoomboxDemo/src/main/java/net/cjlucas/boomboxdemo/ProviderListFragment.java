@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.ListFragment;
 import android.content.Context;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 import android.view.ViewGroup;
@@ -20,6 +21,8 @@ import java.util.Locale;
 
 public class ProviderListFragment extends ListFragment
 {
+    private static final String TAG = "ProviderListFragment";
+
     private Boombox mBoombox;
 
 	public interface OnProviderSelectedListener
@@ -68,7 +71,7 @@ public class ProviderListFragment extends ListFragment
 		super.onActivityCreated(savedInstanceState);
 
 
-		System.out.println("I'm being attached!");
+		Log.d(TAG, "I'm being attached!");
 	}
 
     public void setBoombox(Boombox boombox) {
@@ -77,12 +80,12 @@ public class ProviderListFragment extends ListFragment
         this.adapter = new PlaylistAdapter(getActivity(), android.R.layout.simple_list_item_1, boombox.getPlaylist());
         setListAdapter(this.adapter);
 
-        System.out.println( "omghere: " + this.adapter.getCount() );
+        Log.d(TAG, "omghere: " + this.adapter.getCount());
     }
 
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
-        System.out.println(position + " clicked");
+        Log.d(TAG, position + " clicked");
         mBoombox.play(position);
         if (getActivity() instanceof ProviderListActivity) getActivity().finish();
     }

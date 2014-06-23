@@ -88,7 +88,7 @@ public class MainActivity extends Activity
         Intent intent = new Intent(this, BoomboxService.class);
         startService(intent);
 
-        System.out.println("MainActivity: onCreate");
+        Log.d(TAG, "MainActivity: onCreate");
     }
 
     @Override
@@ -117,8 +117,6 @@ public class MainActivity extends Activity
         mSeekBar = (SeekBar) findViewById(R.id.seekBar);
         mSeekBar.setOnSeekBarChangeListener(this);
         mIsSeeking = false;
-
-        System.out.println(mUpdateUiTimer);
 
         mUpdateUiTimer = new Timer();
         mUpdateUiTimer.schedule(new UpdateUiTimerTask(), 0, UPDATE_UI_INTERVAL);
@@ -169,7 +167,7 @@ public class MainActivity extends Activity
                 URL url = new URL(line);
                 String fileName = url.toString().substring(
                         url.toString().lastIndexOf("/") + 1);
-                System.out.println(fileName);
+                Log.d(TAG, fileName);
                 getBoombox().addProvider(new HttpAudioDataProvider(url, fileName));
             }
 

@@ -1,5 +1,7 @@
 package net.cjlucas.boombox.provider;
 
+import android.util.Log;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 
@@ -9,6 +11,7 @@ import java.net.URL;
 
 
 public class HttpAudioDataProvider extends AudioDataProvider {
+    private static final String TAG = "HttpAudioDataProvider";
     private static final int TIMEOUT = 5000;
 
     private URL mUrl;

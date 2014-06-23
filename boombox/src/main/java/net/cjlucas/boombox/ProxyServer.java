@@ -1,5 +1,7 @@
 package net.cjlucas.boombox;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
@@ -8,6 +10,7 @@ import java.net.Socket;
 import java.net.URL;
 
 public class ProxyServer extends Thread {
+    private static final String TAG = "ProxyServer";
     private String mHost;
     private int mPort;
     private ServerSocket mServerSocket;
@@ -88,7 +91,7 @@ public class ProxyServer extends Thread {
 
     public void sendData(byte[] data) {
         if (mCurrentForwarder == null) {
-            System.err.println("No forwarder available");
+            Log.v(TAG, "No forwarder available");
             return;
         }
 
@@ -101,7 +104,7 @@ public class ProxyServer extends Thread {
 
         while (mRunning) {
             Socket s = accept();
-            System.out.println("ProxyServer: got a connection!");
+            Log.v(TAG, "ProxyServer: got a connection!");
             write(s, "HTTP/1.1 200 OK\r\n");
             if (mContentLength > 0) {
                 write(s, "Content-Length: " + mContentLength + "\r\n");
@@ -115,9 +118,11 @@ public class ProxyServer extends Thread {
                 char[] reqData = new char[16 * 1024];
                 inStream.read(reqData);
 
-                //              System.out.println("Request Data:");
-                //              System.out.println(reqData);
+                Log.d(TAG, "Request Data:");
+                Log.d(TAG, new String(reqData));
+
             } catch (IOException e) {
+                Log.e(TAG, "error occured while reading req data", e);
                 close(s);
                 continue;
             }
@@ -127,7 +132,7 @@ public class ProxyServer extends Thread {
             try {
                 mCurrentForwarder.join();
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Log.e(TAG, "current forwarder was interrupted");
                 stopServer();
             } finally {
                 mCurrentForwarder = null;
@@ -141,10 +146,10 @@ public class ProxyServer extends Thread {
 
     private void write(Socket s, String str) {
         try {
-            System.out.println("ProxyServer: writing: " + str);
+            Log.v(TAG, "ProxyServer: writing: " + str);
             s.getOutputStream().write(str.getBytes(), 0, str.length());
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "could not write to output stream", e);
             stopServer();
         }
     }
@@ -154,6 +159,7 @@ public class ProxyServer extends Thread {
     }
 
     public boolean startServer() {
+        Log.d(TAG, "Starting proxy server");
         try {
             mServerSocket = new ServerSocket(mPort);
             return true;
@@ -164,6 +170,7 @@ public class ProxyServer extends Thread {
     }
 
     public void stopServer() {
+        Log.d(TAG, "Stopping proxy server");
         if (mCurrentForwarder != null) {
             mCurrentForwarder.close();
         }
@@ -182,6 +189,7 @@ public class ProxyServer extends Thread {
     }
 
     private void close(Socket socket) {
+        Log.d(TAG, "closing socket");
         try {
             socket.close();
         } catch (IOException e) {
