@@ -4,6 +4,7 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -17,10 +18,16 @@ public class ProxyServer extends Thread {
     private DataForwarder mCurrentForwarder;
     private long mContentLength;
     private boolean mRunning;
+    private WeakReference<Listener> mListener;
+
+    public interface Listener {
+        void clientDidConnect(ProxyServer proxyServer);
+        void clientDidDisconnect(ProxyServer proxyServer);
+    }
 
     private class DataForwarder extends Thread {
         private Socket mConn;
-        private boolean mWaitingForData;
+        private boolean mHalted;
 
         public DataForwarder(Socket conn) {
             setPriority(Thread.MIN_PRIORITY);
@@ -28,23 +35,26 @@ public class ProxyServer extends Thread {
         }
 
         public void forwardData(byte[] data) {
+            if (mHalted) {
+                return;
+            }
+
             try {
-                //System.out.println( String.format("DataForwarder: writing %d bytes to outputStream", data.length) );
                 mConn.getOutputStream().write(data, 0, data.length);
             } catch (IOException e) {
-                e.printStackTrace();
-                stopServer();
+                Log.e(TAG, "IOException caught, halting data forwarder");
+                halt();
             }
         }
 
-        public void close() {
-            mWaitingForData = false;
+        public void halt() {
+            mHalted = true;
         }
 
         public void run() {
-            mWaitingForData = true;
+            mHalted = false;
 
-            while (mWaitingForData) {
+            while (!mHalted) {
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
@@ -62,6 +72,18 @@ public class ProxyServer extends Thread {
     public ProxyServer(int port) {
         this();
         mPort = port;
+    }
+
+    public void registerListener(Listener listener) {
+        mListener = new WeakReference<>(listener);
+    }
+
+    public void unregisterListener(Listener listener) {
+        mListener = null;
+    }
+
+    private Listener getListener() {
+        return mListener != null ? mListener.get() : null;
     }
 
     public URL getURL() {
@@ -104,8 +126,12 @@ public class ProxyServer extends Thread {
 
         while (mRunning) {
             Socket s = accept();
+            if (getListener() != null) {
+                getListener().clientDidConnect(this);
+            }
             Log.v(TAG, "ProxyServer: got a connection!");
             write(s, "HTTP/1.1 200 OK\r\n");
+            write(s, "Accept-Ranges: none\r\n");
             if (mContentLength > 0) {
                 write(s, "Content-Length: " + mContentLength + "\r\n");
             }
@@ -117,10 +143,6 @@ public class ProxyServer extends Thread {
 
                 char[] reqData = new char[16 * 1024];
                 inStream.read(reqData);
-
-                Log.d(TAG, "Request Data:");
-                Log.d(TAG, new String(reqData));
-
             } catch (IOException e) {
                 Log.e(TAG, "error occured while reading req data", e);
                 close(s);
@@ -139,6 +161,10 @@ public class ProxyServer extends Thread {
             }
 
             close(s);
+
+            if (getListener() != null) {
+                getListener().clientDidDisconnect(this);
+            }
         }
 
         tearDown();
@@ -172,7 +198,7 @@ public class ProxyServer extends Thread {
     public void stopServer() {
         Log.d(TAG, "Stopping proxy server");
         if (mCurrentForwarder != null) {
-            mCurrentForwarder.close();
+            mCurrentForwarder.halt();
         }
 
         mRunning = false;

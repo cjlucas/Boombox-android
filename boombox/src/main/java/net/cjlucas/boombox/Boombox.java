@@ -838,7 +838,7 @@ public class Boombox extends Thread
 
     // Nested classes
 
-    private class ProviderProcessor extends Thread {
+    private class ProviderProcessor extends Thread implements ProxyServer.Listener {
         private static final int BUFFER_SIZE = 64 * 1024;
 
         private AudioDataProvider mProvider;
@@ -852,8 +852,9 @@ public class Boombox extends Thread
         }
 
         public boolean prepare() {
-            if (mProvider.prepare()) {
+            if (prepareProvider()) {
                 mProxyServer.startServer();
+                mProxyServer.registerListener(this);
                 mProxyServer.setContentLength(mProvider.getLength());
                 mProxyServer.start();
 
@@ -867,7 +868,8 @@ public class Boombox extends Thread
 
         private void tearDown() {
             mProxyServer.stopServer();
-            mProvider.release();
+            mProxyServer.unregisterListener(this);
+            releaseProvider();
             releaseProcessor(this);
         }
 
@@ -884,23 +886,17 @@ public class Boombox extends Thread
         }
 
         public void run() {
-            // TODO: add a timeout mechanism
-            // wait for audioProc to connect
-            while (!mProxyServer.hasConnection()) {
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    logi("got interrupted here yo");
+            while (!mShouldHalt) {
+                if (!mProxyServer.isRunning()) {
                     halt();
                 }
-            }
 
-            while (!mShouldHalt) {
-                if (!mProxyServer.isRunning()) halt();
+                if (!mProxyServer.hasConnection()) {
+                    continue;
+                }
 
                 byte[] buffer = new byte[BUFFER_SIZE];
                 int size = mProvider.provideData(buffer);
-                //              System.out.println("size received: " + size);
 
                 if (size > 0) {
                     mProxyServer.sendData(shrinkBuffer(buffer, size));
@@ -921,6 +917,38 @@ public class Boombox extends Thread
             System.arraycopy(buffer, 0, newBuffer, 0, size);
 
             return newBuffer;
+        }
+
+        @Override
+        public void clientDidConnect(ProxyServer proxyServer) {
+            logd("clientDidConnect");
+            prepareProvider();
+        }
+
+        @Override
+        public void clientDidDisconnect(ProxyServer proxyServer) {
+            logd("clientDidDisconnect");
+            releaseProvider();
+        }
+
+        private boolean prepareProvider() {
+            if (mProvider.isPrepared()) {
+                return true;
+            }
+
+            synchronized (mProvider) {
+                return mProvider.prepare();
+            }
+        }
+
+        private void releaseProvider() {
+            if (!mProvider.isPrepared()) {
+                return;
+            }
+
+            synchronized (mProvider) {
+                mProvider.release();
+            }
         }
     }
 }
