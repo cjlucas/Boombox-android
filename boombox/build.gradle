@@ -1,24 +1,24 @@
-apply plugin: 'android-library'
+apply plugin: 'com.android.application'
 apply plugin: 'maven'
 
 version = "1.0.4"
 group = "net.cjlucas"
 
 android {
-    compileSdkVersion 19
+    compileSdkVersion 18
     buildToolsVersion "19.1.0"
 
     defaultConfig {
         minSdkVersion 16
-        targetSdkVersion 19
+        targetSdkVersion 18
     }
-
-    buildTypes {
-        release {
-            runProguard false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
-        }
-    }
+//
+//    buildTypes {
+//        release {
+//            runProguard false
+//            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+//        }
+//    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_7
@@ -27,7 +27,7 @@ android {
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:+'
+    compile 'com.android.support:support-v4:20.0.0'
 }
 
 def coreAarFile = file('build/core.aar')

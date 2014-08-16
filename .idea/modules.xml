@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/boombox.iml" filepath="$PROJECT_DIR$/boombox.iml" />
+      <module fileurl="file://$PROJECT_DIR$/boombox/boombox.iml" filepath="$PROJECT_DIR$/boombox/boombox.iml" />
       <module fileurl="file://$PROJECT_DIR$/boombox-android.iml" filepath="$PROJECT_DIR$/boombox-android.iml" />
       <module fileurl="file://$PROJECT_DIR$/BoomboxDemo/boomboxDemo.iml" filepath="$PROJECT_DIR$/BoomboxDemo/boomboxDemo.iml" />
     </modules>
