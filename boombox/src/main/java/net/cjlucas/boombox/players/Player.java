@@ -52,6 +52,7 @@ public abstract class Player {
     public abstract void play();
     public abstract void pause();
     public abstract void stop();
+    public abstract long getPlaybackPosition();
 
     private static class NoopListener implements Listener {
         @Override

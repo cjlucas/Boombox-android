@@ -166,7 +166,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
      * @param player
      */
     private void releasePlayer(Player player) {
-        synchronized (player) {
+        synchronized (mPlayers) {
             setPlayerState(player, PlayerState.RELEASING);
             player.stop();
             setPlayerState(player, PlayerState.RELEASED);
@@ -223,7 +223,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
         return newIndex % mPlaylist.size();
     }
-    //region Blah
 
     /**
      * Get the index of the previous playlist item.
@@ -244,8 +243,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             return newIndex;
         }
     }
-
-    //endregion
 
     /**
      * Add AudioDataProvider to playlist.
@@ -306,9 +303,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         mPlayerProcessorMap.put(player, processor);
         mPlayerProviderMap.put(player, provider);
 
-        // TODO: find an alternative to this
-//        if (mContinuousMode == ContinuousMode.SINGLE) mp.setLooping(true);
-
         setPlayerState(player, PlayerState.INITIALIZED);
         setPlayerState(player, PlayerState.PREPARING);
         player.prepare();
@@ -319,22 +313,26 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     private Player getCurrentPlayer() {
         Player player = null;
 
-        if (mPlayers.size() > 0) {
-            player = mPlayers.get(0);
+        synchronized (mPlayers) {
+            if (!mPlayers.isEmpty()) {
+                player = mPlayers.get(0);
+            }
         }
 
         return player;
     }
 
     public void play() {
-        Player player = getCurrentPlayer();
+        synchronized (mPlayers) {
+            Player player = getCurrentPlayer();
 
-        // lazy load the player
-        if (player == null) {
-            reqPlayProvider(getCurrentProvider());
-        } else {
-            player.play();
-            setPlayerState(player, PlayerState.STARTED);
+            // lazy load the player
+            if (player == null) {
+                reqPlayProvider(getCurrentProvider());
+            } else {
+                player.play();
+                setPlayerState(player, PlayerState.STARTED);
+            }
         }
     }
 
@@ -366,10 +364,10 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     }
 
     public void pause() {
-        Player player = getCurrentPlayer();
+        synchronized (mPlayers) {
+            Player player = getCurrentPlayer();
 
-        if (player != null) {
-            synchronized (player) {
+            if (player != null) {
                 player.pause();
                 setPlayerState(player, PlayerState.PAUSED);
             }
@@ -377,13 +375,15 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     }
 
     public void togglePlayPause() {
-        Player player = getCurrentPlayer();
+        synchronized (mPlayers) {
+            Player player = getCurrentPlayer();
 
-        // TODO: find an alternative to MediaPlayer.isPlaying()
-        if (player == null /* || !mp.isPlaying() */) {
-            play();
-        } else {
-            pause();
+            // TODO: find an alternative to MediaPlayer.isPlaying()
+            if (player == null || mPlayerStateMap.get(player) == PlayerState.PAUSED) {
+                play();
+            } else {
+                pause();
+            }
         }
     }
 
@@ -413,14 +413,14 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         AudioDataProvider currentProvider = null;
 
         // release queued mPlayers
-        if (mPlayers.size() > 0) {
-            // TODO: find an alternative to this
-//            mPlayers.get(0).setNextMediaPlayer(null);
-            for (int i = 1; i < mPlayers.size(); i++) {
-                releasePlayer(mPlayers.get(i));
-            }
+        synchronized (mPlayers) {
+            if (!mPlayers.isEmpty()) {
+                for (Player player : mPlayers.subList(1, mPlayers.size())) {
+                    releasePlayer(player);
+                }
 
-            currentProvider = mPlayerProviderMap.get(mPlayers.get(0));
+                currentProvider = mPlayerProviderMap.get(mPlayers.get(0));
+            }
         }
 
         synchronized (mPlaylist) {
@@ -502,29 +502,29 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     }
 
     public long getCurrentPosition() {
-        Player player = getCurrentPlayer();
+        synchronized (mPlayers) {
+            Player player = getCurrentPlayer();
 
-        if (player == null) {
-            return 0;
-        }
+            if (player == null) {
+                return 0;
+            }
 
-        synchronized (player) {
             PlayerState state = mPlayerStateMap.get(player);
             return state.isPlaying() ? player.getPlaybackPosition() : 0;
         }
     }
 
     public int getDuration() {
-        Player player = getCurrentPlayer();
-        // Fall back to AudioDataProvider.getDuration() if
-        // we can't get the duration from MediaPlayer
-        int providerDuration = (int) getCurrentProvider().getDuration();
+        synchronized (mPlayers) {
+            Player player = getCurrentPlayer();
+            // Fall back to AudioDataProvider.getDuration() if
+            // we can't get the duration from MediaPlayer
+            int providerDuration = (int) getCurrentProvider().getDuration();
 
-        if (player == null) {
-            return providerDuration;
-        }
+            if (player == null) {
+                return providerDuration;
+            }
 
-        synchronized (player) {
             PlayerState state = mPlayerStateMap.get(player);
 
             // TODO: find an alternative to getDuration()
@@ -542,33 +542,36 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         // TODO: find a better alternative than checking PlayerState
 //        MediaPlayer mp = getCurrentPlayer();
 //        return mp != null && mp.isPlaying();
-        Player player = getCurrentPlayer();
-        return player != null && mPlayerStateMap.get(player) == PlayerState.STARTED;
+        synchronized (mPlayers) {
+            Player player = getCurrentPlayer();
+            return player != null && mPlayerStateMap.get(player) == PlayerState.STARTED;
+        }
     }
 
     public void onProviderProcessorCompleted(ProviderProcessor processor) {
-        Player player = null;
-        synchronized (mPlayerProviderMap) {
-            for (Player p : mPlayerProviderMap.keySet()) {
-                if (mPlayerProviderMap.get(p) == processor.getProvider()) {
+        synchronized (mPlayers) {
+            Player player = null;
+
+            for (Player p : mPlayerProcessorMap.keySet()) {
+                if (mPlayerProcessorMap.get(p) == processor) {
                     player = p;
                     break;
                 }
             }
-        }
 
-        logi("onProviderProcessorCompleted: %s", player);
+            logi("onProviderProcessorCompleted player: %s", player);
 
-        Player tailPlayer = mPlayers.get(mPlayers.size() - 1);
-        AudioDataProvider tailPlayerProvider = mPlayerProviderMap.get(tailPlayer);
-        AudioDataProvider nextProvider = getProviderAfter(tailPlayerProvider);
+            Player tailPlayer = mPlayers.get(mPlayers.size() - 1);
+            AudioDataProvider tailPlayerProvider = mPlayerProviderMap.get(tailPlayer);
+            AudioDataProvider nextProvider = getProviderAfter(tailPlayerProvider);
 
-        logi("tailPlayer: %s", tailPlayer);
-        logi("nexProvider: %s", nextProvider);
+            logi("tailPlayer: %s", tailPlayer);
+            logi("nexProvider: %s", nextProvider);
 
-        if (player == tailPlayer && nextProvider != null) {
-            logi("queueing the next provider");
-            queueProvider(nextProvider);
+            if (player == tailPlayer && nextProvider != null) {
+                logi("queueing the next provider");
+                queueProvider(nextProvider);
+            }
         }
     }
 
@@ -581,26 +584,27 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
     @Override
     public void onPlaybackComplete(Player player) {
-        logi("onCompletion player: %s", player);
+        synchronized (mPlayers) {
+            logi("onCompletion player: %s", player);
 
-        notifyPlaybackCompletion(player, mPlayerProviderMap.get(player));
-        setPlayerState(player, PlayerState.STOPPED);
-        releasePlayer(player); // we want this synchronous so next code is valid
+            notifyPlaybackCompletion(player, mPlayerProviderMap.get(player));
+            setPlayerState(player, PlayerState.STOPPED);
+            releasePlayer(player); // we want this synchronous so next code is valid
 
-        Player currentPlayer = getCurrentPlayer();
-        setPlayerState(currentPlayer, PlayerState.STARTED);
+            Player currentPlayer = getCurrentPlayer();
+            setPlayerState(currentPlayer, PlayerState.STARTED);
 
-        if (currentPlayer != null) {
-            logi("playin da next");
-            currentPlayer.play();
-        }
+            if (currentPlayer != null) {
+                currentPlayer.play();
+            }
 
-        // for safety, if there wasn't a queued player but there is a next provider, queue it now.
-        if (currentPlayer == null && hasNext()) {
-            playNext();
-        } else {
-            // update mPlaylist cursor, or reset if mPlaylist is complete
-            mPlaylistCursor = Math.max(0, getFollowingPlaylistIndex(mPlaylistCursor));
+            // for safety, if there wasn't a queued player but there is a next provider, queue it now.
+            if (currentPlayer == null && hasNext()) {
+                playNext();
+            } else {
+                // update mPlaylist cursor, or reset if mPlaylist is complete
+                mPlaylistCursor = Math.max(0, getFollowingPlaylistIndex(mPlaylistCursor));
+            }
         }
     }
 
@@ -818,11 +822,11 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         }
 
         private void tearDown() {
+            onProviderProcessorCompleted(this);
             mProxyServer.stopServer();
             mProxyServer.unregisterListener(this);
             releaseProvider();
             releaseProcessor(this);
-            onProviderProcessorCompleted(this);
         }
 
         public URL getProxyURL() {
