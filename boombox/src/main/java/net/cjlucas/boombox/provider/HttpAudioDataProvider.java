@@ -24,7 +24,7 @@ public class HttpAudioDataProvider extends AudioDataProvider {
     }
 
     public HttpAudioDataProvider(URL url) {
-        this(url, url.getFile());
+        this(url, url);
     }
 
     public long getLength() {
