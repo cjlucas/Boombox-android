@@ -2,6 +2,7 @@ package net.cjlucas.boombox.players;
 
 import android.media.AudioFormat;
 import android.media.AudioManager;
+import android.media.AudioTimestamp;
 import android.media.AudioTrack;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
@@ -18,8 +19,11 @@ public class AudioTrackPlayer extends Player
         implements AudioTrack.OnPlaybackPositionUpdateListener {
     private static final String TAG = "AudioTrackPlayer";
 
+    private MediaExtractor mMediaExtractor;
     private AudioDecoder mDecoder;
     private AudioTrack mAudioTrack;
+    private AudioTimestamp mAudioTimestamp;
+    private long mTimeElapsed;
 
     public AudioTrackPlayer(String dataSource) {
         super(dataSource);
@@ -33,27 +37,31 @@ public class AudioTrackPlayer extends Player
                 AudioTrack.MODE_STREAM);
 
         mAudioTrack.setPlaybackPositionUpdateListener(this);
-        mAudioTrack.setPositionNotificationPeriod(10);
+        mAudioTrack.setPositionNotificationPeriod(1000);
     }
 
     @Override
     public boolean prepare() {
-        MediaExtractor extractor = new MediaExtractor();
+        mMediaExtractor = new MediaExtractor();
 
         try {
-            extractor.setDataSource(getDataSource());
+            mMediaExtractor.setDataSource(getDataSource());
         } catch (IOException e) {
             Log.e(TAG, "Could not prepare", e);
-            return false;
+//            return false;
         }
 
-        mDecoder = new AudioDecoder(extractor, mAudioTrack);
-        mDecoder.start();
+        mDecoder = new AudioDecoder(mMediaExtractor, mAudioTrack);
+        notifyPrepared();
         return true;
     }
 
     @Override
     public void play() {
+        System.out.println("state: " + mAudioTrack.getPlayState());
+        if (mAudioTrack.getPlayState() == AudioTrack.PLAYSTATE_STOPPED) {
+            mDecoder.start();
+        }
         mAudioTrack.play();
     }
 
@@ -75,10 +83,16 @@ public class AudioTrackPlayer extends Player
 
     @Override
     public void onPeriodicNotification(AudioTrack track) {
-        System.out.println("onPeriodicNotification: " + track.getPlaybackHeadPosition());
+        AudioTimestamp timestamp = new AudioTimestamp();
+        track.getTimestamp(timestamp);
+
+        if (mAudioTimestamp != null) {
+            mTimeElapsed += ((timestamp.nanoTime - mAudioTimestamp.nanoTime) / 1.0E7);
+        }
+        mAudioTimestamp = timestamp;
     }
 
-    private static class AudioDecoder extends Thread {
+    private class AudioDecoder extends Thread {
         private MediaExtractor mExtractor;
         private AudioTrack mAudioTrack;
         private boolean mShouldHalt;
@@ -142,10 +156,8 @@ public class AudioTrackPlayer extends Player
 
                 switch (outputBufferIndex) {
                     case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                        System.out.println("hereee");
                         Integer newSampleRate = codec.getOutputFormat()
                                 .getInteger(MediaFormat.KEY_SAMPLE_RATE);
-                        System.out.println(newSampleRate);
                         mAudioTrack.setPlaybackRate(newSampleRate);
                         continue;
                     case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
@@ -166,6 +178,10 @@ public class AudioTrackPlayer extends Player
             }
 
             mExtractor.release();
+            if (mAudioTrack.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
+                AudioTrackPlayer.this.stop();
+                notifyPlaybackComplete();
+            }
         }
     }
 }
