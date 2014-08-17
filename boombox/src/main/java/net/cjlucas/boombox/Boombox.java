@@ -29,7 +29,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     private final List<AudioDataProvider> mProviders;
     private final List<AudioDataProvider> mPlaylist;
     private final List<Player> mPlayers;
-    private final List<ProviderProcessor> mProcessors;
+    private final Map<Player, ProviderProcessor> mPlayerProcessorMap;
     private final Map<Player, AudioDataProvider> mPlayerProviderMap;
     private final Map<Player, PlayerState> mPlayerStateMap;
 
@@ -61,7 +61,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
     enum MessageType {
         RELEASE_PLAYER(1),
-        RELEASE_PROCESSOR(1 << 1),
+        RELEASE_PROCESSOR(1 << 1), // unused
         PLAY_PROVIDER(1 << 2),
         SHUFFLE_PLAYLIST(1 << 3),
         RESET_PLAYLIST(1 << 4);
@@ -94,7 +94,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         mProviders = Collections.synchronizedList(new ArrayList<AudioDataProvider>());
         mPlaylist = Collections.synchronizedList(new ArrayList<AudioDataProvider>());
         mPlayers = Collections.synchronizedList(new ArrayList<Player>());
-        mProcessors = Collections.synchronizedList(new ArrayList<ProviderProcessor>());
+        mPlayerProcessorMap = new ConcurrentHashMap<>();
         mPlayerProviderMap = new ConcurrentHashMap<>();
         mPlayerStateMap = new ConcurrentHashMap<>();
         mPlaylistCursor = 0;
@@ -141,15 +141,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             for (Player player : players)
                 releasePlayer(player);
         }
-        mPlayers.clear();
-
-        synchronized (mProcessors) {
-            ArrayList<ProviderProcessor> processors = new ArrayList<>(mProcessors);
-            for (ProviderProcessor processor : processors)
-                releaseProcessor(processor);
-        }
-
-        mProcessors.clear();
     }
 
     /**
@@ -167,7 +158,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             e.printStackTrace();
         } finally {
             pp.interrupt();
-            mProcessors.remove(pp);
         }
     }
 
@@ -181,8 +171,13 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             player.stop();
             setPlayerState(player, PlayerState.RELEASED);
 
+            // release associated ProviderProcessor
+            releaseProcessor(mPlayerProcessorMap.get(player));
+
             mPlayers.remove(player);
+            mPlayerProcessorMap.remove(player);
             mPlayerProviderMap.remove(player);
+            mPlayerStateMap.remove(player);
         }
     }
 
@@ -212,9 +207,13 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
      * Get the index of the next playlist item.
      *
      * @param index the current index
-     * @return the next index
+     * @return the following index
      */
     private int getFollowingPlaylistIndex(int index) {
+        if (mContinuousMode == ContinuousMode.SINGLE) {
+            return index;
+        }
+
         int newIndex = index + 1;
 
         if (mContinuousMode != ContinuousMode.PLAYLIST
@@ -224,10 +223,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
         return newIndex % mPlaylist.size();
     }
-
-    private int getNextPlaylistCursor() {
-        return getFollowingPlaylistIndex(mPlaylistCursor);
-    }
+    //region Blah
 
     /**
      * Get the index of the previous playlist item.
@@ -236,19 +232,20 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
      * @return the previous index
      */
     private int getPrecedingPlaylistIndex(int index) {
+        if (mContinuousMode == ContinuousMode.SINGLE) {
+            return index;
+        }
+
         int newIndex = index - 1;
 
         if (newIndex < 0) {
-            return mContinuousMode == ContinuousMode.PLAYLIST
-                    ? mPlaylist.size() - 1 : -1;
+            return mContinuousMode == ContinuousMode.PLAYLIST ? mPlaylist.size() - 1 : -1;
         } else {
             return newIndex;
         }
     }
 
-    private int getPreviousPlaylistCursor() {
-        return getPrecedingPlaylistIndex(mPlaylistCursor);
-    }
+    //endregion
 
     /**
      * Add AudioDataProvider to playlist.
@@ -264,13 +261,13 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     }
 
     public AudioDataProvider getNextProvider() {
-        int nextCursor = getNextPlaylistCursor();
+        int nextCursor = getFollowingPlaylistIndex(mPlaylistCursor);
 
         return nextCursor == -1 ? null : mPlaylist.get(nextCursor);
     }
 
     public AudioDataProvider getPreviousProvider() {
-        int prevCursor = getPreviousPlaylistCursor();
+        int prevCursor = getPrecedingPlaylistIndex(mPlaylistCursor);
 
         return prevCursor == -1 ? null : mPlaylist.get(prevCursor);
     }
@@ -289,10 +286,10 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     }
 
     private void queueProvider(AudioDataProvider provider) {
-        ProviderProcessor pp = new ProviderProcessor(provider);
+        ProviderProcessor processor = new ProviderProcessor(provider);
 
         // if data mProvider could not be prepared, skip to the next track
-        if (!pp.prepare()) {
+        if (!processor.prepare()) {
             if (hasNext()) {
                 playNext();
             } else {
@@ -300,13 +297,13 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             }
             return;
         }
-        pp.start();
+        processor.start();
 
-        Player player = new AudioTrackPlayer(pp.getProxyURL().toString());
+        Player player = new AudioTrackPlayer(processor.getProxyURL().toString());
         player.setListener(this);
 
         mPlayers.add(player);
-        mProcessors.add(pp);
+        mPlayerProcessorMap.put(player, processor);
         mPlayerProviderMap.put(player, provider);
 
         // TODO: find an alternative to this
@@ -391,23 +388,23 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     }
 
     public boolean hasNext() {
-        return getNextPlaylistCursor() != -1;
+        return getFollowingPlaylistIndex(mPlaylistCursor) != -1;
     }
 
     public boolean hasPrevious() {
-        return getPreviousPlaylistCursor() != -1;
+        return getPrecedingPlaylistIndex(mPlaylistCursor) != -1;
     }
 
     public void playNext() {
         if (hasNext()) {
-            mPlaylistCursor = getNextPlaylistCursor();
+            mPlaylistCursor = getFollowingPlaylistIndex(mPlaylistCursor);
             reqPlayProvider(mPlaylist.get(mPlaylistCursor));
         }
     }
 
     public void playPrevious() {
         if (hasPrevious()) {
-            mPlaylistCursor = getPreviousPlaylistCursor();
+            mPlaylistCursor = getPrecedingPlaylistIndex(mPlaylistCursor);
             reqPlayProvider(mPlaylist.get(mPlaylistCursor));
         }
     }
@@ -488,15 +485,15 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     public void setContinuousMode(ContinuousMode continuousMode) {
         if (mContinuousMode == continuousMode) return;
 
-        ContinuousMode oldMode = mContinuousMode;
         mContinuousMode = continuousMode;
 
-        if (oldMode == ContinuousMode.SINGLE) {
-            setLooping(false);
-        }
-
-        if (mContinuousMode == ContinuousMode.SINGLE) {
-            setLooping(true);
+        // Release queued players
+        if (mContinuousMode == ContinuousMode.SINGLE && !mPlayers.isEmpty()) {
+            synchronized (mPlayers) {
+                for (Player player : mPlayers.subList(1, mPlaylist.size())) {
+                    reqReleasePlayer(player);
+                }
+            }
         }
     }
 
@@ -504,7 +501,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         return mContinuousMode;
     }
 
-    public int getCurrentPosition() {
+    public long getCurrentPosition() {
         Player player = getCurrentPlayer();
 
         if (player == null) {
@@ -513,9 +510,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
         synchronized (player) {
             PlayerState state = mPlayerStateMap.get(player);
-            // TODO: find an alternative to this
-//            return state.isPlaying() ? player.getCurrentPosition() : 0;
-            return 0;
+            return state.isPlaying() ? player.getPlaybackPosition() : 0;
         }
     }
 
@@ -549,15 +544,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 //        return mp != null && mp.isPlaying();
         Player player = getCurrentPlayer();
         return player != null && mPlayerStateMap.get(player) == PlayerState.STARTED;
-    }
-
-    private void setLooping(boolean looping) {
-        synchronized (mPlayers) {
-            for (Player player : mPlayers) {
-                // TODO: find an alternative to setLooping
-//                player.setLooping(looping);
-            }
-        }
     }
 
     public void onProviderProcessorCompleted(ProviderProcessor processor) {
@@ -614,7 +600,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             playNext();
         } else {
             // update mPlaylist cursor, or reset if mPlaylist is complete
-            mPlaylistCursor = Math.max(0, getNextPlaylistCursor());
+            mPlaylistCursor = Math.max(0, getFollowingPlaylistIndex(mPlaylistCursor));
         }
     }
 
@@ -623,19 +609,10 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         logi("onPrepared player: %s", player);
         setPlayerState(player, PlayerState.PREPARED);
 
-        /*
-         * If given player is at the head of the list, immediately start
-         * playing. Otherwise, queue the player to the tail.
-         */
-        int index = mPlayers.indexOf(player);
-        logi("index = " + index);
-        if (index == 0) {
+        if (mPlayers.indexOf(player) == 0) {
             player.play();
             setPlayerState(player, PlayerState.STARTED);
             notifyPlaybackStart(mPlayerProviderMap.get(player));
-        } else {
-            // TODO: find an alternative for this
-//            mPlayers.get(index - 1).setNextMediaPlayer(player);
         }
     }
 
@@ -662,22 +639,8 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         }
     }
 
-    private void reqReleaseProcessor(ProviderProcessor pp) {
-        Message msg = obtainMessage(MessageType.RELEASE_PROCESSOR, pp);
-        mHandler.sendMessage(msg);
-    }
-
-    private void reqReleaseAllProcessors() {
-        synchronized (mProcessors) {
-            for (ProviderProcessor pp : mProcessors) {
-                reqReleaseProcessor(pp);
-            }
-        }
-    }
-
     private void reqPlayProvider(AudioDataProvider provider) {
         reqReleaseAllPlayers();
-        reqReleaseAllProcessors();
 
         Message msg = obtainMessage(MessageType.PLAY_PROVIDER, provider);
         mHandler.sendMessage(msg);
