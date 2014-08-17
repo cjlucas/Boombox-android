@@ -303,6 +303,11 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         pp.start();
 
         Player player = new AudioTrackPlayer(pp.getProxyURL().toString());
+        player.setListener(this);
+
+        mPlayers.add(player);
+        mProcessors.add(pp);
+        mPlayerProviderMap.put(player, provider);
 
         // TODO: find an alternative to this
 //        if (mContinuousMode == ContinuousMode.SINGLE) mp.setLooping(true);
@@ -310,10 +315,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         setPlayerState(player, PlayerState.INITIALIZED);
         setPlayerState(player, PlayerState.PREPARING);
         player.prepare();
-
-        mProcessors.add(pp);
-        mPlayers.add(player);
-        mPlayerProviderMap.put(player, provider);
     }
 
     // Playback Controls
@@ -559,6 +560,32 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         }
     }
 
+    public void onProviderProcessorCompleted(ProviderProcessor processor) {
+        Player player = null;
+        synchronized (mPlayerProviderMap) {
+            for (Player p : mPlayerProviderMap.keySet()) {
+                if (mPlayerProviderMap.get(p) == processor.getProvider()) {
+                    player = p;
+                    break;
+                }
+            }
+        }
+
+        logi("onProviderProcessorCompleted: %s", player);
+
+        Player tailPlayer = mPlayers.get(mPlayers.size() - 1);
+        AudioDataProvider tailPlayerProvider = mPlayerProviderMap.get(tailPlayer);
+        AudioDataProvider nextProvider = getProviderAfter(tailPlayerProvider);
+
+        logi("tailPlayer: %s", tailPlayer);
+        logi("nexProvider: %s", nextProvider);
+
+        if (player == tailPlayer && nextProvider != null) {
+            logi("queueing the next provider");
+            queueProvider(nextProvider);
+        }
+    }
+
     // MediaPlayer Callbacks
 
     @Override
@@ -577,26 +604,17 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         Player currentPlayer = getCurrentPlayer();
         setPlayerState(currentPlayer, PlayerState.STARTED);
 
+        if (currentPlayer != null) {
+            logi("playin da next");
+            currentPlayer.play();
+        }
+
         // for safety, if there wasn't a queued player but there is a next provider, queue it now.
         if (currentPlayer == null && hasNext()) {
             playNext();
         } else {
             // update mPlaylist cursor, or reset if mPlaylist is complete
             mPlaylistCursor = Math.max(0, getNextPlaylistCursor());
-        }
-    }
-
-    @Override
-    public void onBufferComplete(Player player) {
-        logi("onBufferComplete player: %s", player);
-
-        Player tailPlayer = mPlayers.get(mPlayers.size() - 1);
-        AudioDataProvider tailPlayerProvider = mPlayerProviderMap.get(tailPlayer);
-        AudioDataProvider nextProvider = getProviderAfter(tailPlayerProvider);
-
-        if (player == tailPlayer && nextProvider != null) {
-            logi("queueing the next provider");
-            queueProvider(nextProvider);
         }
     }
 
@@ -610,6 +628,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
          * playing. Otherwise, queue the player to the tail.
          */
         int index = mPlayers.indexOf(player);
+        logi("index = " + index);
         if (index == 0) {
             player.play();
             setPlayerState(player, PlayerState.STARTED);
@@ -618,9 +637,6 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             // TODO: find an alternative for this
 //            mPlayers.get(index - 1).setNextMediaPlayer(player);
         }
-    }
-
-    public void onPrepared(MediaPlayer player) {
     }
 
     // Request senders
@@ -843,6 +859,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             mProxyServer.unregisterListener(this);
             releaseProvider();
             releaseProcessor(this);
+            onProviderProcessorCompleted(this);
         }
 
         public URL getProxyURL() {
