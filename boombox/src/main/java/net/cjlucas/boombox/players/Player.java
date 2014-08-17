@@ -10,7 +10,6 @@ public abstract class Player {
         void onPrepared(Player player);
         void onPlaybackStart(Player player);
         void onPlaybackComplete(Player player);
-        void onBufferComplete(Player player);
     }
 
     private String mDataSource;
@@ -41,12 +40,12 @@ public abstract class Player {
         getListener().onPlaybackStart(this);
     }
 
-    protected void notifyPlaybackStop() {
+    protected void notifyPlaybackComplete() {
         getListener().onPlaybackComplete(this);
     }
 
-    protected void notifyBufferComplete() {
-        getListener().onBufferComplete(this);
+    protected void notifyPrepared() {
+        getListener().onPrepared(this);
     }
 
     public abstract boolean prepare();
@@ -61,7 +60,5 @@ public abstract class Player {
         public void onPlaybackStart(Player player) {}
         @Override
         public void onPlaybackComplete(Player player) {}
-        @Override
-        public void onBufferComplete(Player player) {}
     }
 }
