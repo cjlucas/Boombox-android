@@ -59,14 +59,23 @@ public class AudioTrackPlayer extends Player
     @Override
     public void play() {
         System.out.println("state: " + mAudioTrack.getPlayState());
-        if (mAudioTrack.getPlayState() == AudioTrack.PLAYSTATE_STOPPED) {
-            mDecoder.start();
+
+        switch (mAudioTrack.getPlayState()) {
+            case AudioTrack.PLAYSTATE_STOPPED:
+                mDecoder.start();
+                break;
+            case AudioTrack.PLAYSTATE_PAUSED:
+                mDecoder.resumeDecoding();
+                break;
+            default:
+                break;
         }
         mAudioTrack.play();
     }
 
     @Override
     public void pause() {
+        mDecoder.pauseDecoding();
         mAudioTrack.pause();
     }
 
@@ -77,6 +86,12 @@ public class AudioTrackPlayer extends Player
         mDecoder.halt();
     }
 
+
+    @Override
+    public long getPlaybackPosition() {
+        return mTimeElapsed;
+    }
+
     @Override
     public void onMarkerReached(AudioTrack track) {
     }
@@ -84,27 +99,38 @@ public class AudioTrackPlayer extends Player
     @Override
     public void onPeriodicNotification(AudioTrack track) {
         AudioTimestamp timestamp = new AudioTimestamp();
-        track.getTimestamp(timestamp);
-
-        if (mAudioTimestamp != null) {
-            mTimeElapsed += ((timestamp.nanoTime - mAudioTimestamp.nanoTime) / 1.0E7);
+        if (track.getTimestamp(timestamp)) {
+            mTimeElapsed += mAudioTimestamp != null
+                    ? ((timestamp.nanoTime - mAudioTimestamp.nanoTime) * 1.0E-6)
+                    : 0;
+            mAudioTimestamp = timestamp;
         }
-        mAudioTimestamp = timestamp;
+
     }
 
     private class AudioDecoder extends Thread {
         private MediaExtractor mExtractor;
         private AudioTrack mAudioTrack;
         private boolean mShouldHalt;
+        private boolean mPaused;
 
         public AudioDecoder(MediaExtractor extractor, AudioTrack audioTrack) {
             mExtractor = extractor;
             mAudioTrack = audioTrack;
             mShouldHalt = false;
+            mPaused = false;
         }
 
         public void halt() {
             mShouldHalt = true;
+        }
+
+        public void resumeDecoding() {
+            mPaused = false;
+        }
+
+        public void pauseDecoding() {
+            mPaused = true;
         }
 
         @Override
@@ -126,6 +152,10 @@ public class AudioTrackPlayer extends Player
             boolean sawInputEOS = false;
 
             while (!sawInputEOS && !mShouldHalt) {
+                if (mPaused) {
+                    continue;
+                }
+
                 int inputBufferIndex = codec.dequeueInputBuffer(-1);
 
                 ByteBuffer dstBuf = codecInputBuffers[inputBufferIndex];
