@@ -884,10 +884,23 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
                             break;
                         }
                     }
+
+                    safeSleep(100);
                 }
+
+                safeSleep(100);
             }
 
             tearDown();
+        }
+
+        private void safeSleep(int millis) {
+            try {
+                sleep(100);
+            } catch (InterruptedException e) {
+                logv("%s was interrupted", this);
+                halt();
+            }
         }
 
         private byte[] shrinkBuffer(byte[] buffer, int size) {
