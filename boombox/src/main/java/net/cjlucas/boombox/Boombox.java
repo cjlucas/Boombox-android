@@ -796,7 +796,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
     private class ProviderProcessor extends Thread implements ProxyServer.Listener {
         private static final int BUFFER_SIZE = 64 * 1024;
 
-        private AudioDataProvider mProvider;
+        private final AudioDataProvider mProvider;
         private ProxyServer mProxyServer;
         private boolean mShouldHalt;
 
@@ -821,10 +821,13 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
             return false;
         }
 
-        private void tearDown() {
-            onProviderProcessorCompleted(this);
+        public void stopServer() {
             mProxyServer.stopServer();
             mProxyServer.unregisterListener(this);
+        }
+
+        private void tearDown() {
+            stopServer();
             releaseProvider();
             releaseProcessor(this);
         }
@@ -843,25 +846,32 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
         public void run() {
             while (!mShouldHalt) {
-                if (!mProxyServer.isRunning()) {
-                    halt();
-                }
+                while (mProxyServer.hasConnection()) {
+                    if (mShouldHalt) {
+                        break;
+                    }
 
-                if (!mProxyServer.hasConnection()) {
-                    continue;
-                }
+                    synchronized (mProvider) {
+                        if (!mProvider.isPrepared()) {
+                            mProvider.prepare();
+                        }
 
-                byte[] buffer = new byte[BUFFER_SIZE];
-                int size = mProvider.provideData(buffer);
+                        byte[] buffer = new byte[BUFFER_SIZE];
+                        int size = mProvider.provideData(buffer);
 
-                if (size > 0) {
-                    mProxyServer.sendData(shrinkBuffer(buffer, size));
-                } else if (size == AudioDataProvider.STATUS_EOF_REACHED) {
-                    logi("ProviderProcessor: EOF_REACHED");
-                    halt();
-                } else if (size == AudioDataProvider.STATUS_ERROR_OCCURED) {
-                    loge("ProviderProcessor: ERROR_OCCURED");
-                    halt();
+                        if (size > 0) {
+                            mProxyServer.sendData(shrinkBuffer(buffer, size));
+                        } else if (size == AudioDataProvider.STATUS_EOF_REACHED) {
+                            logi("%s: EOF_REACHED", this);
+                            onProviderProcessorCompleted(this);
+                            releaseProvider();
+                            break;
+                        } else if (size == AudioDataProvider.STATUS_ERROR_OCCURED) {
+                            loge("%s: ERROR_OCCURED", this);
+                            releaseProvider();
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -878,23 +888,15 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         @Override
         public void clientDidConnect(ProxyServer proxyServer) {
             logd("clientDidConnect");
-            prepareProvider();
         }
 
         @Override
         public void clientDidDisconnect(ProxyServer proxyServer) {
             logd("clientDidDisconnect");
-            releaseProvider();
         }
 
         private boolean prepareProvider() {
-            if (mProvider.isPrepared()) {
-                return true;
-            }
-
-            synchronized (mProvider) {
-                return mProvider.prepare();
-            }
+            return mProvider.isPrepared() || mProvider.prepare();
         }
 
         private void releaseProvider() {
@@ -902,9 +904,7 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
                 return;
             }
 
-            synchronized (mProvider) {
-                mProvider.release();
-            }
+            mProvider.release();
         }
     }
 }

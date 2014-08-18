@@ -34,7 +34,7 @@ public abstract class AudioDataProvider {
     public boolean prepare() {
         mIsPrepeared = true;
         return true;
-    };
+    }
 
     public abstract int provideData(byte[] buffer);
 

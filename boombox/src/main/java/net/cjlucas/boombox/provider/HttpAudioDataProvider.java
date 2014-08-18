@@ -55,6 +55,7 @@ public class HttpAudioDataProvider extends AudioDataProvider {
         try {
             return mInStream.read(buffer);
         } catch (IOException e) {
+//            Log.e(TAG, "IOException thrown", e);
             return STATUS_ERROR_OCCURED;
         }
     }
