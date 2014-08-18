@@ -151,13 +151,16 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         pp.halt();
 
         try {
-            logi("joining");
+            logi("joining %s", pp);
             pp.join(500);
-            logi("done joining");
+            logi("finished joining %s", pp);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            loge("%s: join was interrupted", pp);
         } finally {
-            pp.interrupt();
+            if (pp.isAlive()) {
+                logi("%s is still alive, interrupting now.", pp);
+                pp.interrupt();
+            }
         }
     }
 
@@ -166,18 +169,22 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
      * @param player
      */
     private void releasePlayer(Player player) {
+        ProviderProcessor processor = mPlayerProcessorMap.get(player);
+
         synchronized (mPlayers) {
             setPlayerState(player, PlayerState.RELEASING);
             player.stop();
             setPlayerState(player, PlayerState.RELEASED);
 
-            // release associated ProviderProcessor
-            releaseProcessor(mPlayerProcessorMap.get(player));
-
             mPlayers.remove(player);
             mPlayerProcessorMap.remove(player);
             mPlayerProviderMap.remove(player);
             mPlayerStateMap.remove(player);
+        }
+
+        // release associated ProviderProcessor
+        if (processor != null) {
+            releaseProcessor(processor);
         }
     }
 
@@ -308,19 +315,24 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
         player.prepare();
     }
 
-    // Playback Controls
-
-    private Player getCurrentPlayer() {
+    private Player getPlayerAtIndex(int index) {
         Player player = null;
 
         synchronized (mPlayers) {
-            if (!mPlayers.isEmpty()) {
-                player = mPlayers.get(0);
+            if (mPlayers.size() > index) {
+                player = mPlayers.get(index);
             }
         }
 
         return player;
     }
+
+    private Player getCurrentPlayer() {
+        return getPlayerAtIndex(0);
+    }
+
+    // Playback Controls
+
 
     public void play() {
         synchronized (mPlayers) {
@@ -589,17 +601,17 @@ public class Boombox extends Thread implements Handler.Callback, Player.Listener
 
             notifyPlaybackCompletion(player, mPlayerProviderMap.get(player));
             setPlayerState(player, PlayerState.STOPPED);
-            releasePlayer(player); // we want this synchronous so next code is valid
+            Player nextPlayer = getPlayerAtIndex(1); // get the next player
+            reqReleasePlayer(player);
 
-            Player currentPlayer = getCurrentPlayer();
-            setPlayerState(currentPlayer, PlayerState.STARTED);
+            setPlayerState(nextPlayer, PlayerState.STARTED);
 
-            if (currentPlayer != null) {
-                currentPlayer.play();
+            if (nextPlayer != null) {
+                nextPlayer.play();
             }
 
             // for safety, if there wasn't a queued player but there is a next provider, queue it now.
-            if (currentPlayer == null && hasNext()) {
+            if (nextPlayer == null && hasNext()) {
                 playNext();
             } else {
                 // update mPlaylist cursor, or reset if mPlaylist is complete
